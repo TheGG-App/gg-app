@@ -1,0 +1,261 @@
+// src/shared/hooks/useEnhancedStorage.js - Better storage for large recipe collections
+
+import { useState, useEffect, useCallback } from 'react';
+
+/**
+ * Enhanced storage hook with compression, backup, and better error handling
+ * @param {string} key - Storage key
+ * @param {any} initialValue - Initial value
+ * @param {Object} options - Storage options
+ */
+export function useEnhancedStorage(key, initialValue, options = {}) {
+  const {
+    compress = true, // Compress data to save space
+    backup = true,   // Create periodic backups
+    maxBackups = 5,  // Maximum number of backups to keep
+    debounce = 500   // Debounce saves to prevent excessive writes
+  } = options;
+
+  const [storedValue, setStoredValue] = useState(() => {
+    try {
+      return loadFromStorage(key, initialValue, compress);
+    } catch (error) {
+      console.error(`Error loading ${key} from storage:`, error);
+      return initialValue;
+    }
+  });
+
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  // Debounced save function
+  const debouncedSave = useCallback(
+    debounceFunction((value) => {
+      saveToStorage(key, value, compress, backup, maxBackups);
+    }, debounce),
+    [key, compress, backup, maxBackups]
+  );
+
+  const setValue = useCallback((value) => {
+    try {
+      setError(null);
+      setStoredValue(value);
+      debouncedSave(value);
+    } catch (error) {
+      console.error(`Error saving ${key} to storage:`, error);
+      setError(error.message);
+    }
+  }, [key, debouncedSave]);
+
+  // Export function
+  const exportData = useCallback(() => {
+    try {
+      const data = {
+        data: storedValue,
+        timestamp: new Date().toISOString(),
+        version: '1.0',
+        key: key
+      };
+      
+      const blob = new Blob([JSON.stringify(data, null, 2)], { 
+        type: 'application/json' 
+      });
+      
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${key}-backup-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      return true;
+    } catch (error) {
+      console.error('Export failed:', error);
+      setError('Export failed: ' + error.message);
+      return false;
+    }
+  }, [storedValue, key]);
+
+  // Import function
+  const importData = useCallback((file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      
+      reader.onload = (e) => {
+        try {
+          const imported = JSON.parse(e.target.result);
+          
+          if (imported.key !== key) {
+            throw new Error(`Data key mismatch. Expected ${key}, got ${imported.key}`);
+          }
+          
+          setValue(imported.data);
+          resolve(imported.data);
+        } catch (error) {
+          setError('Import failed: ' + error.message);
+          reject(error);
+        }
+      };
+      
+      reader.onerror = () => {
+        const error = new Error('Failed to read file');
+        setError(error.message);
+        reject(error);
+      };
+      
+      reader.readAsText(file);
+    });
+  }, [key, setValue]);
+
+  // Get storage stats
+  const getStorageStats = useCallback(() => {
+    try {
+      const data = localStorage.getItem(key);
+      const backups = getBackupKeys(key);
+      
+      return {
+        mainSize: data ? new Blob([data]).size : 0,
+        backupCount: backups.length,
+        totalSize: backups.reduce((total, backupKey) => {
+          const backup = localStorage.getItem(backupKey);
+          return total + (backup ? new Blob([backup]).size : 0);
+        }, data ? new Blob([data]).size : 0),
+        lastModified: localStorage.getItem(`${key}_lastModified`) || null
+      };
+    } catch (error) {
+      return { error: error.message };
+    }
+  }, [key]);
+
+  return {
+    value: storedValue,
+    setValue,
+    isLoading,
+    error,
+    exportData,
+    importData,
+    getStorageStats,
+    clearError: () => setError(null)
+  };
+}
+
+// Helper functions
+
+function loadFromStorage(key, initialValue, compress) {
+  try {
+    const item = localStorage.getItem(key);
+    if (!item) return initialValue;
+    
+    let parsed;
+    if (compress && item.startsWith('compressed:')) {
+      // Decompress data (simple base64 for now, could use LZ77 or similar)
+      const compressed = item.substring(11);
+      const decompressed = atob(compressed);
+      parsed = JSON.parse(decompressed);
+    } else {
+      parsed = JSON.parse(item);
+    }
+    
+    return parsed;
+  } catch (error) {
+    console.warn(`Failed to load ${key}, using initial value:`, error);
+    return initialValue;
+  }
+}
+
+function saveToStorage(key, value, compress, backup, maxBackups) {
+  try {
+    let dataToStore = JSON.stringify(value);
+    
+    // Compress if enabled and data is large enough
+    if (compress && dataToStore.length > 1000) {
+      const compressed = btoa(dataToStore);
+      dataToStore = 'compressed:' + compressed;
+    }
+    
+    // Create backup if enabled
+    if (backup && localStorage.getItem(key)) {
+      createBackup(key, maxBackups);
+    }
+    
+    // Save main data
+    localStorage.setItem(key, dataToStore);
+    localStorage.setItem(`${key}_lastModified`, new Date().toISOString());
+    
+  } catch (error) {
+    if (error.name === 'QuotaExceededError') {
+      // Try to free up space by removing old backups
+      cleanupOldBackups(key, Math.floor(maxBackups / 2));
+      
+      // Try saving again
+      try {
+        localStorage.setItem(key, dataToStore);
+        localStorage.setItem(`${key}_lastModified`, new Date().toISOString());
+      } catch (retryError) {
+        throw new Error('Storage quota exceeded. Please export your data and clear some space.');
+      }
+    } else {
+      throw error;
+    }
+  }
+}
+
+function createBackup(key, maxBackups) {
+  try {
+    const existingData = localStorage.getItem(key);
+    if (!existingData) return;
+    
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const backupKey = `${key}_backup_${timestamp}`;
+    
+    localStorage.setItem(backupKey, existingData);
+    
+    // Clean up old backups
+    cleanupOldBackups(key, maxBackups);
+  } catch (error) {
+    console.warn('Failed to create backup:', error);
+  }
+}
+
+function getBackupKeys(key) {
+  const backupKeys = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const storageKey = localStorage.key(i);
+    if (storageKey && storageKey.startsWith(`${key}_backup_`)) {
+      backupKeys.push(storageKey);
+    }
+  }
+  return backupKeys.sort();
+}
+
+function cleanupOldBackups(key, maxBackups) {
+  const backupKeys = getBackupKeys(key);
+  
+  if (backupKeys.length > maxBackups) {
+    const toDelete = backupKeys.slice(0, backupKeys.length - maxBackups);
+    toDelete.forEach(backupKey => {
+      try {
+        localStorage.removeItem(backupKey);
+      } catch (error) {
+        console.warn(`Failed to remove backup ${backupKey}:`, error);
+      }
+    });
+  }
+}
+
+function debounceFunction(func, wait) {
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+}
+
+// Export enhanced localStorage hook as default
+export default useEnhancedStorage;
