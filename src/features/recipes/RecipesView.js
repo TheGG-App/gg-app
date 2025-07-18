@@ -1,7 +1,7 @@
 // src/features/recipes/RecipesView.js - Fixed hoisting issue
 import React, { useState, useCallback } from 'react';
 import MealTypeLanding from './components/MealTypeLanding';
-import RecipeFilters from './components/RecipeFilters';
+import FilterBar from '../../shared/components/FilterBar';
 import CompactRecipeCard from './components/CompactRecipeCard';
 import RecipeModal from './components/RecipeModal';
 import TagEditModal from './components/TagEditModal';
@@ -405,7 +405,7 @@ function RecipesView({ recipes, setRecipes, openaiApiKey }) {
       )}
 
       {/* Filters */}
-      <RecipeFilters
+      <FilterBar
         searchTerm={searchTerm}
         setSearchTerm={setSearchTerm}
         filterCookTime={filterState.cookTime}

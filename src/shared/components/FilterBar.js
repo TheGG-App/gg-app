@@ -1,193 +1,307 @@
+// src/shared/components/FilterBar.js - Complete rewrite that actually works
 import React from 'react';
+import { BASIC_TAGS, COOKING_METHODS } from '../../features/recipes/utils/recipeUtils';
 
-function FilterBar({ 
-  filterMealType, 
-  setFilterMealType, 
-  filterTags, 
-  setFilterTags, 
-  mealTypes, 
-  title = "Filter Recipes" 
+function FilterBar({
+  searchTerm,
+  setSearchTerm,
+  filterCookTime,
+  setFilterCookTime,
+  filterTags,
+  setFilterTags,
+  onClearFilters,
+  title = "Filter & Search"
 }) {
   
-  const handleTagFilter = (tagName, value) => {
-    setFilterTags(prev => ({ ...prev, [tagName]: value }));
+  const handleTagToggle = (tagKey) => {
+    setFilterTags(prev => ({
+      ...prev,
+      [tagKey]: !prev[tagKey]
+    }));
   };
+
+  const hasActiveFilters = filterCookTime !== 'all' || 
+    Object.values(filterTags).some(value => value);
 
   return (
     <div style={{
-      background: 'rgba(255, 255, 255, 0.9)',
-      backdropFilter: 'blur(10px)',
-      borderRadius: '15px',
-      padding: '20px',
-      marginBottom: '20px',
-      boxShadow: '0 4px 20px rgba(139, 69, 19, 0.1)',
-      border: '1px solid rgba(255, 182, 193, 0.3)'
+      background: 'rgba(255, 255, 255, 0.95)',
+      borderRadius: '20px',
+      padding: '25px',
+      marginBottom: '25px',
+      boxShadow: '0 4px 15px rgba(139, 90, 60, 0.1)',
+      border: '2px solid #EEB182'
     }}>
-      <h3 style={{ 
-        margin: '0 0 15px 0', 
-        color: 'var(--brown-dark)', 
+      <h3 style={{
+        margin: '0 0 20px 0',
+        color: '#8B5A3C',
         fontSize: '1.3rem',
-        fontWeight: '700'
+        fontWeight: '700',
+        fontFamily: 'Georgia, serif'
       }}>
         🔍 {title}
       </h3>
-      
-      <div style={{ 
-        display: 'flex', 
-        gap: '20px', 
-        alignItems: 'center', 
-        flexWrap: 'wrap' 
-      }}>
-        {/* Meal Type Filter */}
-        <select
-          value={filterMealType}
-          onChange={(e) => setFilterMealType(e.target.value)}
+
+      {/* Search Bar */}
+      <div style={{ marginBottom: '20px' }}>
+        <input
+          type="text"
+          placeholder="Search recipes by name, ingredients, or instructions..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
           style={{
-            padding: '10px 15px',
-            borderRadius: '10px',
-            border: '2px solid rgba(139, 69, 19, 0.3)',
+            width: '100%',
+            padding: '12px 16px',
+            borderRadius: '12px',
+            border: '2px solid #8B5A3C',
+            fontSize: '1rem',
             outline: 'none',
-            background: 'rgba(255, 255, 255, 0.9)',
-            fontWeight: '600',
-            color: 'var(--brown-dark)',
+            background: 'white',
+            fontFamily: 'Georgia, serif',
+            boxSizing: 'border-box'
+          }}
+        />
+      </div>
+
+      {/* Cook Time Filter */}
+      <div style={{ marginBottom: '20px' }}>
+        <label style={{
+          display: 'block',
+          marginBottom: '8px',
+          color: '#8B5A3C',
+          fontWeight: '600',
+          fontSize: '0.9rem'
+        }}>
+          Cook Time
+        </label>
+        <select
+          value={filterCookTime}
+          onChange={(e) => setFilterCookTime(e.target.value)}
+          style={{
+            width: '200px',
+            padding: '10px 12px',
+            borderRadius: '8px',
+            border: '2px solid #8B5A3C',
+            outline: 'none',
+            background: 'white',
+            fontFamily: 'Georgia, serif',
             cursor: 'pointer'
           }}
         >
-          <option value="all">All Types</option>
-          {mealTypes.map(type => (
-            <option key={type} value={type}>
-              {type.charAt(0).toUpperCase() + type.slice(1)}
-            </option>
-          ))}
+          <option value="all">All Cook Times</option>
+          <option value="under15">Under 15 min</option>
+          <option value="under30">Under 30 min</option>
+          <option value="under60">Under 1 hour</option>
         </select>
-        
-        {/* Family Approved Filter */}
-        <label style={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          gap: '8px', 
-          cursor: 'pointer',
-          padding: '8px 12px',
-          borderRadius: '8px',
-          background: filterTags.familyApproved ? 'rgba(34, 197, 94, 0.1)' : 'transparent',
-          border: filterTags.familyApproved ? '2px solid #22c55e' : '2px solid transparent',
-          transition: 'all 0.2s ease'
-        }}>
-          <input
-            type="checkbox"
-            checked={filterTags.familyApproved}
-            onChange={(e) => handleTagFilter('familyApproved', e.target.checked)}
-            style={{ width: '16px', height: '16px' }}
-          />
-          <span style={{ 
-            color: 'var(--brown-dark)', 
-            fontWeight: '600',
-            fontSize: '14px'
-          }}>
-            👨‍👩‍👧‍👦 Family Approved Only
-          </span>
-        </label>
-        
-        {/* Meal Prep Filter */}
-        <label style={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          gap: '8px', 
-          cursor: 'pointer',
-          padding: '8px 12px',
-          borderRadius: '8px',
-          background: filterTags.mealPrep ? 'rgba(221, 160, 221, 0.1)' : 'transparent',
-          border: filterTags.mealPrep ? '2px solid var(--plum)' : '2px solid transparent',
-          transition: 'all 0.2s ease'
-        }}>
-          <input
-            type="checkbox"
-            checked={filterTags.mealPrep}
-            onChange={(e) => handleTagFilter('mealPrep', e.target.checked)}
-            style={{ width: '16px', height: '16px' }}
-          />
-          <span style={{ 
-            color: 'var(--brown-dark)', 
-            fontWeight: '600',
-            fontSize: '14px'
-          }}>
-            🥘 Meal Prep Only
-          </span>
-        </label>
+      </div>
 
-        {/* Clear Filters Button */}
-        {(filterMealType !== 'all' || filterTags.familyApproved || filterTags.mealPrep) && (
+      {/* Basic Tags Filter */}
+      <div style={{ marginBottom: '20px' }}>
+        <label style={{
+          display: 'block',
+          marginBottom: '12px',
+          color: '#8B5A3C',
+          fontWeight: '600',
+          fontSize: '0.9rem'
+        }}>
+          Basic Tags
+        </label>
+        <div style={{
+          display: 'flex',
+          gap: '10px',
+          flexWrap: 'wrap',
+          marginBottom: '15px'
+        }}>
+          {BASIC_TAGS.map(tag => (
+            <button
+              key={tag.key}
+              onClick={() => handleTagToggle(tag.key)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                cursor: 'pointer',
+                padding: '10px 15px',
+                borderRadius: '12px',
+                background: filterTags[tag.key] 
+                  ? 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)' 
+                  : 'rgba(139, 90, 60, 0.05)',
+                border: `2px solid ${filterTags[tag.key] ? '#22c55e' : '#8B5A3C'}`,
+                color: filterTags[tag.key] ? 'white' : '#8B5A3C',
+                fontSize: '0.9rem',
+                fontWeight: '600',
+                transition: 'all 0.3s ease',
+                boxShadow: filterTags[tag.key] ? '0 4px 15px rgba(34, 197, 94, 0.3)' : 'none'
+              }}
+              onMouseOver={(e) => {
+                if (!filterTags[tag.key]) {
+                  e.target.style.background = 'rgba(139, 90, 60, 0.1)';
+                  e.target.style.transform = 'translateY(-2px)';
+                }
+              }}
+              onMouseOut={(e) => {
+                if (!filterTags[tag.key]) {
+                  e.target.style.background = 'rgba(139, 90, 60, 0.05)';
+                  e.target.style.transform = 'translateY(0)';
+                }
+              }}
+            >
+              <span style={{ fontSize: '1.1rem' }}>{tag.icon}</span>
+              <span>{tag.label}</span>
+              {filterTags[tag.key] && <span style={{ fontSize: '0.9rem', marginLeft: '4px' }}>✓</span>}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Cooking Methods Filter */}
+      <div style={{ marginBottom: '20px' }}>
+        <label style={{
+          display: 'block',
+          marginBottom: '12px',
+          color: '#BF5B4B',
+          fontWeight: '600',
+          fontSize: '0.9rem'
+        }}>
+          Cooking Methods
+        </label>
+        <div style={{
+          display: 'flex',
+          gap: '10px',
+          flexWrap: 'wrap'
+        }}>
+          {COOKING_METHODS.map(method => (
+            <button
+              key={method.key}
+              onClick={() => handleTagToggle(method.key)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                cursor: 'pointer',
+                padding: '10px 15px',
+                borderRadius: '12px',
+                background: filterTags[method.key] 
+                  ? 'linear-gradient(135deg, #BF5B4B 0%, #991b1b 100%)' 
+                  : 'rgba(191, 91, 75, 0.05)',
+                border: `2px solid ${filterTags[method.key] ? '#BF5B4B' : '#BF5B4B'}`,
+                color: filterTags[method.key] ? 'white' : '#BF5B4B',
+                fontSize: '0.9rem',
+                fontWeight: '600',
+                transition: 'all 0.3s ease',
+                boxShadow: filterTags[method.key] ? '0 4px 15px rgba(191, 91, 75, 0.3)' : 'none'
+              }}
+              onMouseOver={(e) => {
+                if (!filterTags[method.key]) {
+                  e.target.style.background = 'rgba(191, 91, 75, 0.1)';
+                  e.target.style.transform = 'translateY(-2px)';
+                }
+              }}
+              onMouseOut={(e) => {
+                if (!filterTags[method.key]) {
+                  e.target.style.background = 'rgba(191, 91, 75, 0.05)';
+                  e.target.style.transform = 'translateY(0)';
+                }
+              }}
+            >
+              <span style={{ fontSize: '1.1rem' }}>{method.icon}</span>
+              <span>{method.label}</span>
+              {filterTags[method.key] && <span style={{ fontSize: '0.9rem', marginLeft: '4px' }}>✓</span>}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Clear Filters Button */}
+      {hasActiveFilters && (
+        <div style={{ display: 'flex', justifyContent: 'center', marginTop: '20px' }}>
           <button
-            onClick={() => {
-              setFilterMealType('all');
-              setFilterTags({ familyApproved: false, mealPrep: false });
-            }}
+            onClick={onClearFilters}
             style={{
               background: 'linear-gradient(135deg, #6b7280 0%, #4b5563 100%)',
               color: 'white',
               border: 'none',
-              padding: '8px 16px',
-              borderRadius: '8px',
+              padding: '12px 24px',
+              borderRadius: '12px',
               cursor: 'pointer',
-              fontSize: '12px',
-              fontWeight: 'bold',
-              transition: 'transform 0.2s ease'
+              fontSize: '0.9rem',
+              fontWeight: '600',
+              fontFamily: 'Georgia, serif',
+              transition: 'all 0.2s ease',
+              boxShadow: '0 4px 15px rgba(107, 114, 128, 0.3)'
             }}
-            onMouseOver={(e) => e.target.style.transform = 'translateY(-1px)'}
-            onMouseOut={(e) => e.target.style.transform = 'translateY(0)'}
+            onMouseOver={(e) => {
+              e.target.style.background = 'linear-gradient(135deg, #4b5563 0%, #374151 100%)';
+              e.target.style.transform = 'translateY(-2px)';
+              e.target.style.boxShadow = '0 6px 20px rgba(107, 114, 128, 0.4)';
+            }}
+            onMouseOut={(e) => {
+              e.target.style.background = 'linear-gradient(135deg, #6b7280 0%, #4b5563 100%)';
+              e.target.style.transform = 'translateY(0)';
+              e.target.style.boxShadow = '0 4px 15px rgba(107, 114, 128, 0.3)';
+            }}
           >
-            ✨ Clear Filters
+            ✨ Clear All Filters
           </button>
-        )}
-      </div>
-      
+        </div>
+      )}
+
       {/* Active Filters Display */}
-      {(filterMealType !== 'all' || filterTags.familyApproved || filterTags.mealPrep) && (
+      {hasActiveFilters && (
         <div style={{ 
-          marginTop: '15px', 
-          padding: '10px', 
-          background: 'linear-gradient(135deg, rgba(255, 182, 193, 0.1) 0%, rgba(221, 160, 221, 0.1) 100%)',
-          borderRadius: '8px',
-          border: '1px solid rgba(139, 69, 19, 0.1)'
+          marginTop: '20px', 
+          padding: '15px', 
+          background: 'linear-gradient(135deg, rgba(139, 90, 60, 0.05) 0%, rgba(238, 177, 130, 0.1) 100%)',
+          borderRadius: '12px',
+          border: '1px solid rgba(139, 90, 60, 0.2)'
         }}>
-          <div style={{ fontSize: '12px', color: 'var(--text-dark)', fontWeight: '600' }}>
-            Active filters: 
-            {filterMealType !== 'all' && (
+          <div style={{ 
+            fontSize: '0.9rem', 
+            color: '#8B5A3C', 
+            fontWeight: '600',
+            marginBottom: '8px'
+          }}>
+            Active Filters:
+          </div>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            {filterCookTime !== 'all' && (
               <span style={{ 
-                marginLeft: '8px',
-                padding: '2px 8px',
-                background: 'var(--brown-dark)',
+                padding: '4px 8px',
+                background: '#8B5A3C',
                 color: 'white',
-                borderRadius: '12px',
-                fontSize: '11px'
+                borderRadius: '8px',
+                fontSize: '0.8rem',
+                fontWeight: '600'
               }}>
-                {filterMealType}
+                {filterCookTime === 'under15' ? 'Under 15 min' :
+                 filterCookTime === 'under30' ? 'Under 30 min' :
+                 filterCookTime === 'under60' ? 'Under 1 hour' : filterCookTime}
               </span>
             )}
-            {filterTags.familyApproved && (
-              <span style={{ 
-                marginLeft: '8px',
-                padding: '2px 8px',
+            {BASIC_TAGS.filter(tag => filterTags[tag.key]).map(tag => (
+              <span key={tag.key} style={{ 
+                padding: '4px 8px',
                 background: '#22c55e',
                 color: 'white',
-                borderRadius: '12px',
-                fontSize: '11px'
+                borderRadius: '8px',
+                fontSize: '0.8rem',
+                fontWeight: '600'
               }}>
-                Family Approved
+                {tag.icon} {tag.label}
               </span>
-            )}
-            {filterTags.mealPrep && (
-              <span style={{ 
-                marginLeft: '8px',
-                padding: '2px 8px',
-                background: 'var(--plum)',
+            ))}
+            {COOKING_METHODS.filter(method => filterTags[method.key]).map(method => (
+              <span key={method.key} style={{ 
+                padding: '4px 8px',
+                background: '#BF5B4B',
                 color: 'white',
-                borderRadius: '12px',
-                fontSize: '11px'
+                borderRadius: '8px',
+                fontSize: '0.8rem',
+                fontWeight: '600'
               }}>
-                Meal Prep
+                {method.icon} {method.label}
               </span>
-            )}
+            ))}
           </div>
         </div>
       )}
