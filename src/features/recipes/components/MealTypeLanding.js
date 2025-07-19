@@ -17,21 +17,62 @@ function MealTypeLanding({
   // Ensure recipes is always an array
   const safeRecipes = Array.isArray(recipes) ? recipes : [];
   
+  // Validate and filter out invalid recipes
+  const validRecipes = safeRecipes.filter((recipe, index) => {
+    if (!recipe || typeof recipe !== 'object') {
+      console.warn(`Invalid recipe at index ${index}:`, recipe);
+      return false;
+    }
+    if (!recipe.title || typeof recipe.title !== 'string') {
+      console.warn(`Recipe missing title at index ${index}:`, recipe);
+      return false;
+    }
+    return true;
+  });
+  
+  // Log any invalid recipes for debugging
+  if (validRecipes.length < safeRecipes.length) {
+    console.warn(`Found ${safeRecipes.length - validRecipes.length} invalid recipes out of ${safeRecipes.length} total`);
+  }
+  
   const getRecipeCount = (mealType) => {
-    if (mealType === 'all') return safeRecipes.length;
-    return safeRecipes.filter(recipe => recipe?.mealType === mealType).length;
+    if (mealType === 'all') return validRecipes.length;
+    return validRecipes.filter(recipe => {
+      // Skip invalid recipes
+      if (!recipe || typeof recipe !== 'object') return false;
+      return recipe.mealType === mealType;
+    }).length;
   };
 
-  // Filter recipes based on search
+  // Filter recipes based on search with robust error handling
   const filteredRecipes = searchTerm 
-    ? safeRecipes.filter(recipe => {
-        if (!recipe || !recipe.title) return false;
+    ? validRecipes.filter(recipe => {
+        // Skip invalid recipes
+        if (!recipe || typeof recipe !== 'object') {
+          console.warn('Invalid recipe object:', recipe);
+          return false;
+        }
+        
+        // Check if recipe has required properties
+        if (!recipe.title || typeof recipe.title !== 'string') {
+          console.warn('Recipe missing title:', recipe);
+          return false;
+        }
+        
         const searchLower = searchTerm.toLowerCase();
-        return (
-          recipe.title.toLowerCase().includes(searchLower) ||
-          (recipe.ingredients && recipe.ingredients.toLowerCase().includes(searchLower)) ||
-          (recipe.mealType && recipe.mealType.toLowerCase().includes(searchLower))
-        );
+        
+        try {
+          return (
+            recipe.title.toLowerCase().includes(searchLower) ||
+            (recipe.ingredients && typeof recipe.ingredients === 'string' && 
+             recipe.ingredients.toLowerCase().includes(searchLower)) ||
+            (recipe.mealType && typeof recipe.mealType === 'string' && 
+             recipe.mealType.toLowerCase().includes(searchLower))
+          );
+        } catch (error) {
+          console.error('Error filtering recipe:', recipe, error);
+          return false;
+        }
       })
     : [];
 
@@ -382,7 +423,7 @@ function MealTypeLanding({
                       fontSize: '1.1rem',
                       color: '#1f2937'
                     }}>
-                      {recipe.title}
+                      {recipe.title || 'Untitled Recipe'}
                     </h4>
                     <div style={{
                       display: 'flex',
@@ -390,7 +431,7 @@ function MealTypeLanding({
                       fontSize: '0.85rem',
                       color: '#6b7280'
                     }}>
-                      <span>{MEAL_TYPES.find(m => m.key === recipe.mealType)?.label || recipe.mealType}</span>
+                      <span>{MEAL_TYPES.find(m => m.key === recipe.mealType)?.label || recipe.mealType || 'Unknown'}</span>
                       {recipe.cookTime && (
                         <>
                           <span>•</span>
