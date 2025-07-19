@@ -1,41 +1,68 @@
-// src/features/recipes/components/MealTypeLanding.js - Fixed with null checks
+// src/features/recipes/components/MealTypeLanding.js - Self-contained version
 import React, { useState } from 'react';
 import { MEAL_TYPES } from '../utils/recipeUtils';
 
 function MealTypeLanding({ 
   onSelectMealType, 
-  recipes = [], // Default to empty array
-  showImport, 
-  setShowImport, 
-  importInput, 
-  setImportInput, 
-  isImporting, 
-  openaiApiKey, 
-  handleImportClick,
-  allRecipes = [], // Default to empty array
-  onRecipeClick
+  recipes = [],
+  openaiApiKey,
+  onRecipeClick,
+  onImportRecipe // New prop for handling import
 }) {
   const [searchTerm, setSearchTerm] = useState('');
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importInput, setImportInput] = useState('');
+  const [isImporting, setIsImporting] = useState(false);
   
-  // Add null check for recipes
-  const safeRecipes = recipes || [];
-  const safeAllRecipes = allRecipes || [];
+  // Ensure recipes is always an array
+  const safeRecipes = Array.isArray(recipes) ? recipes : [];
   
   const getRecipeCount = (mealType) => {
     if (mealType === 'all') return safeRecipes.length;
-    return safeRecipes.filter(recipe => recipe.mealType === mealType).length;
+    return safeRecipes.filter(recipe => recipe?.mealType === mealType).length;
   };
 
-  // Filter recipes based on search with null check
+  // Filter recipes based on search
   const filteredRecipes = searchTerm 
-    ? safeAllRecipes.filter(recipe =>
-        recipe && recipe.title && recipe.ingredients && recipe.mealType && (
-          recipe.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          recipe.ingredients.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          recipe.mealType.toLowerCase().includes(searchTerm.toLowerCase())
-        )
-      )
+    ? safeRecipes.filter(recipe => {
+        if (!recipe || !recipe.title) return false;
+        const searchLower = searchTerm.toLowerCase();
+        return (
+          recipe.title.toLowerCase().includes(searchLower) ||
+          (recipe.ingredients && recipe.ingredients.toLowerCase().includes(searchLower)) ||
+          (recipe.mealType && recipe.mealType.toLowerCase().includes(searchLower))
+        );
+      })
     : [];
+
+  const handleImportClick = async () => {
+    if (!importInput.trim()) {
+      alert('Please enter a recipe URL or paste recipe text!');
+      return;
+    }
+
+    if (!openaiApiKey) {
+      alert('Please add your OpenAI API key in Settings to import recipes.');
+      return;
+    }
+
+    setIsImporting(true);
+    
+    try {
+      // If parent provided an import handler, use it
+      if (onImportRecipe) {
+        await onImportRecipe(importInput);
+        setImportInput('');
+        setShowImportModal(false);
+      } else {
+        alert('Import functionality not available. Please try again later.');
+      }
+    } catch (error) {
+      alert('Error importing recipe: ' + error.message);
+    } finally {
+      setIsImporting(false);
+    }
+  };
 
   // Food images for each meal type
   const mealTypeImages = {
@@ -60,7 +87,7 @@ function MealTypeLanding({
         zIndex: 1000
       }}>
         <button
-          onClick={() => setShowImport(true)}
+          onClick={() => setShowImportModal(true)}
           style={{
             background: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)',
             color: 'white',
@@ -91,7 +118,7 @@ function MealTypeLanding({
       </div>
 
       {/* Import Modal */}
-      {showImport && (
+      {showImportModal && (
         <div
           style={{
             position: 'fixed',
@@ -103,7 +130,7 @@ function MealTypeLanding({
             justifyContent: 'center',
             padding: '20px'
           }}
-          onClick={() => setShowImport(false)}
+          onClick={() => setShowImportModal(false)}
         >
           <div
             style={{
@@ -179,7 +206,7 @@ function MealTypeLanding({
               justifyContent: 'flex-end'
             }}>
               <button
-                onClick={() => setShowImport(false)}
+                onClick={() => setShowImportModal(false)}
                 style={{
                   background: '#f3f4f6',
                   color: '#6b7280',
@@ -364,8 +391,12 @@ function MealTypeLanding({
                       color: '#6b7280'
                     }}>
                       <span>{MEAL_TYPES.find(m => m.key === recipe.mealType)?.label || recipe.mealType}</span>
-                      <span>•</span>
-                      <span>{recipe.cookTime || 'Time not set'}</span>
+                      {recipe.cookTime && (
+                        <>
+                          <span>•</span>
+                          <span>{recipe.cookTime}</span>
+                        </>
+                      )}
                       {recipe.nutrition?.servings && (
                         <>
                           <span>•</span>
@@ -432,7 +463,8 @@ function MealTypeLanding({
                 height: '180px',
                 backgroundImage: `url(${mealTypeImages[mealType.key]})`,
                 backgroundSize: 'cover',
-                backgroundPosition: 'center'
+                backgroundPosition: 'center',
+                backgroundColor: '#f3f4f6'
               }}>
               </div>
 
