@@ -44,7 +44,7 @@ class IngredientIconService {
     return ingredient.toLowerCase().trim()
       .replace(/\s+/g, ' ')
       .replace(/[0-9]+\s*(cups?|tbsp?|tsp?|lbs?|oz|g|kg|ml|l)\s*/gi, '')
-      .replace(/^\d+[\s\/]*/, '')
+      .replace(/^\d+[\s/]*/, '')
       .replace(/,.*$/, '')
       .trim();
   }

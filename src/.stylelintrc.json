@@ -1,0 +1,17 @@
+{
+  "extends": ["stylelint-config-standard"],
+  "rules": {
+    "property-no-vendor-prefix": [
+      true,
+      {
+        "ignoreProperties": ["-webkit-line-clamp", "-webkit-box-orient"]
+      }
+    ],
+    "value-no-vendor-prefix": [
+      true,
+      {
+        "ignoreValues": ["-webkit-box"]
+      }
+    ]
+  }
+}
