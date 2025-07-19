@@ -1,4 +1,4 @@
-// src/features/recipes/components/CompactRecipeCard.js - Fixed with one modal at a time
+// src/features/recipes/components/CompactRecipeCard.js - Updated with black nutrition text
 import React, { useState, useRef } from 'react';
 import { formatNutritionValue } from '../../../shared/utils/formatters';
 import { BASIC_TAGS, COOKING_METHODS } from '../utils/recipeUtils';
@@ -24,7 +24,7 @@ function CompactRecipeCard({ recipe, onClick, onUpdate }) {
     if (tagButtonRef.current) {
       const rect = tagButtonRef.current.getBoundingClientRect();
       setModalPosition({
-        x: Math.max(10, rect.left - 300), // Adjusted for wider modal
+        x: Math.max(10, rect.left - 300),
         y: rect.top
       });
     }
@@ -73,8 +73,8 @@ function CompactRecipeCard({ recipe, onClick, onUpdate }) {
           borderRadius: '15px',
           padding: '20px',
           marginBottom: '15px',
-          boxShadow: '0 4px 15px rgba(139, 90, 60, 0.1)',
-          border: '2px solid #EEB182',
+          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)',
+          border: '1px solid #f0f0f0',
           cursor: 'pointer',
           transition: 'all 0.3s ease',
           display: 'flex',
@@ -83,20 +83,22 @@ function CompactRecipeCard({ recipe, onClick, onUpdate }) {
         }}
         onMouseOver={(e) => {
           e.currentTarget.style.transform = 'translateY(-2px)';
-          e.currentTarget.style.boxShadow = '0 8px 25px rgba(139, 90, 60, 0.2)';
+          e.currentTarget.style.boxShadow = '0 4px 15px rgba(0, 0, 0, 0.1)';
+          e.currentTarget.style.borderColor = '#e5e7eb';
         }}
         onMouseOut={(e) => {
           e.currentTarget.style.transform = 'translateY(0)';
-          e.currentTarget.style.boxShadow = '0 4px 15px rgba(139, 90, 60, 0.1)';
+          e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.06)';
+          e.currentTarget.style.borderColor = '#f0f0f0';
         }}
       >
-        {/* Recipe Image - NO IMAGE GENERATION */}
+        {/* Recipe Image */}
         <div style={{
           width: '100px',
           height: '80px',
           borderRadius: '12px',
           overflow: 'hidden',
-          background: '#F0D0C1',
+          background: '#f3f4f6',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -113,12 +115,12 @@ function CompactRecipeCard({ recipe, onClick, onUpdate }) {
               }}
               onError={(e) => {
                 e.target.style.display = 'none';
-                e.target.parentElement.innerHTML = '<div style="color: #8B5A3C; font-size: 1.5rem;">🍽️</div>';
+                e.target.parentElement.innerHTML = '<div style="color: #9ca3af; font-size: 1.5rem;">🍽️</div>';
               }}
             />
           ) : (
             <div style={{
-              color: '#8B5A3C',
+              color: '#9ca3af',
               fontSize: '1.8rem'
             }}>
               🍽️
@@ -132,7 +134,7 @@ function CompactRecipeCard({ recipe, onClick, onUpdate }) {
             margin: '0 0 8px 0',
             fontSize: '1.3rem',
             fontWeight: '700',
-            color: '#333',
+            color: '#1f2937',
             fontFamily: 'Georgia, serif',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
@@ -146,7 +148,7 @@ function CompactRecipeCard({ recipe, onClick, onUpdate }) {
             display: 'flex',
             gap: '20px',
             fontSize: '0.85rem',
-            color: '#666',
+            color: '#6b7280',
             marginBottom: '10px',
             flexWrap: 'wrap'
           }}>
@@ -166,26 +168,14 @@ function CompactRecipeCard({ recipe, onClick, onUpdate }) {
 
           {/* Tags with + Button */}
           <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
-            {/* Recipe Type Tag */}
-            <span style={{
-              background: '#8B5A3C',
-              color: 'white',
-              padding: '3px 8px',
-              borderRadius: '10px',
-              fontSize: '0.7rem',
-              fontWeight: '600'
-            }}>
-              Recipe
-            </span>
-
             {/* Active Tags */}
             {activeTags.map((tag, index) => (
               <span key={`${tag.key}-${index}`} style={{
-                background: tag.type === 'basic' ? '#22c55e' : '#BF5B4B',
+                background: tag.type === 'basic' ? '#22c55e' : '#06b6d4',
                 color: 'white',
-                padding: '3px 8px',
+                padding: '3px 10px',
                 borderRadius: '10px',
-                fontSize: '0.7rem',
+                fontSize: '0.75rem',
                 fontWeight: '500'
               }}>
                 {tag.icon} {tag.label}
@@ -197,8 +187,8 @@ function CompactRecipeCard({ recipe, onClick, onUpdate }) {
               ref={tagButtonRef}
               onClick={handleTagEditClick}
               style={{
-                background: '#8B5A3C',
-                color: 'white',
+                background: '#f3f4f6',
+                color: '#6b7280',
                 border: 'none',
                 borderRadius: '50%',
                 width: '24px',
@@ -212,11 +202,13 @@ function CompactRecipeCard({ recipe, onClick, onUpdate }) {
                 transition: 'all 0.2s ease'
               }}
               onMouseOver={(e) => {
-                e.target.style.background = '#CA8462';
+                e.target.style.background = '#06b6d4';
+                e.target.style.color = 'white';
                 e.target.style.transform = 'scale(1.1)';
               }}
               onMouseOut={(e) => {
-                e.target.style.background = '#8B5A3C';
+                e.target.style.background = '#f3f4f6';
+                e.target.style.color = '#6b7280';
                 e.target.style.transform = 'scale(1)';
               }}
             >
@@ -225,22 +217,23 @@ function CompactRecipeCard({ recipe, onClick, onUpdate }) {
           </div>
         </div>
 
-        {/* Enhanced Nutrition Box */}
+        {/* Nutrition Box - BLACK TEXT, BLUE BORDER */}
         {(recipe.nutrition?.calories || recipe.nutrition?.protein) && (
           <div style={{
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
             padding: '15px',
-            background: 'linear-gradient(135deg, #F0D0C1 0%, #EEB182 100%)',
+            background: 'white',
             borderRadius: '12px',
             minWidth: '140px',
             flexShrink: 0,
-            border: '2px solid #8B5A3C'
+            border: '2px solid #06b6d4',
+            boxShadow: '0 2px 8px rgba(6, 182, 212, 0.1)'
           }}>
             <div style={{
               fontSize: '0.7rem',
-              color: '#8B5A3C',
+              color: '#1f2937', // BLACK TEXT
               fontWeight: '700',
               marginBottom: '8px',
               textAlign: 'center',
@@ -258,10 +251,10 @@ function CompactRecipeCard({ recipe, onClick, onUpdate }) {
             }}>
               {recipe.nutrition?.calories && (
                 <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: '1rem', fontWeight: '700', color: '#BF5B4B' }}>
+                  <div style={{ fontSize: '1rem', fontWeight: '700', color: '#06b6d4' }}>
                     {formatNutritionValue(recipe.nutrition.calories, '')}
                   </div>
-                  <div style={{ fontSize: '0.6rem', color: '#8B5A3C', fontWeight: '600' }}>
+                  <div style={{ fontSize: '0.6rem', color: '#1f2937', fontWeight: '600' }}>
                     calories
                   </div>
                 </div>
@@ -269,10 +262,10 @@ function CompactRecipeCard({ recipe, onClick, onUpdate }) {
               
               {recipe.nutrition?.protein && (
                 <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: '1rem', fontWeight: '700', color: '#8B5A3C' }}>
+                  <div style={{ fontSize: '1rem', fontWeight: '700', color: '#06b6d4' }}>
                     {formatNutritionValue(recipe.nutrition.protein, 'g')}
                   </div>
-                  <div style={{ fontSize: '0.6rem', color: '#8B5A3C', fontWeight: '600' }}>
+                  <div style={{ fontSize: '0.6rem', color: '#1f2937', fontWeight: '600' }}>
                     protein
                   </div>
                 </div>
@@ -280,10 +273,10 @@ function CompactRecipeCard({ recipe, onClick, onUpdate }) {
               
               {recipe.nutrition?.carbs && (
                 <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: '1rem', fontWeight: '700', color: '#CA8462' }}>
+                  <div style={{ fontSize: '1rem', fontWeight: '700', color: '#06b6d4' }}>
                     {formatNutritionValue(recipe.nutrition.carbs, 'g')}
                   </div>
-                  <div style={{ fontSize: '0.6rem', color: '#8B5A3C', fontWeight: '600' }}>
+                  <div style={{ fontSize: '0.6rem', color: '#1f2937', fontWeight: '600' }}>
                     carbs
                   </div>
                 </div>
@@ -291,22 +284,11 @@ function CompactRecipeCard({ recipe, onClick, onUpdate }) {
               
               {recipe.nutrition?.fat && (
                 <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: '1rem', fontWeight: '700', color: '#EEB182' }}>
+                  <div style={{ fontSize: '1rem', fontWeight: '700', color: '#06b6d4' }}>
                     {formatNutritionValue(recipe.nutrition.fat, 'g')}
                   </div>
-                  <div style={{ fontSize: '0.6rem', color: '#8B5A3C', fontWeight: '600' }}>
+                  <div style={{ fontSize: '0.6rem', color: '#1f2937', fontWeight: '600' }}>
                     fat
-                  </div>
-                </div>
-              )}
-              
-              {recipe.nutrition?.fiber && (
-                <div style={{ textAlign: 'center', gridColumn: '1 / -1' }}>
-                  <div style={{ fontSize: '1rem', fontWeight: '700', color: '#22c55e' }}>
-                    {formatNutritionValue(recipe.nutrition.fiber, 'g')}
-                  </div>
-                  <div style={{ fontSize: '0.6rem', color: '#8B5A3C', fontWeight: '600' }}>
-                    fiber
                   </div>
                 </div>
               )}
