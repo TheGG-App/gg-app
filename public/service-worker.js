@@ -1,49 +1,37 @@
-// public/service-worker.js - PWA Service Worker
+// public/service-worker.js - PWA Service Worker for G&G Recipe App
+/* eslint-disable no-restricted-globals */
+
 const CACHE_NAME = 'gg-recipes-v1';
-const STATIC_CACHE = 'gg-static-v1';
 const IMAGE_CACHE = 'gg-images-v1';
 
-// Files to cache immediately
-const STATIC_FILES = [
-  '/',
-  '/index.html',
-  '/static/css/main.css',
-  '/static/js/main.js',
-  '/manifest.json',
-  '/favicon.ico'
-];
-
-// Install event - cache static assets
+// Install event - skip waiting
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(STATIC_CACHE).then((cache) => {
-      console.log('Caching static assets');
-      return cache.addAll(STATIC_FILES.map(url => new Request(url, { cache: 'no-cache' })));
-    }).catch((error) => {
-      console.error('Failed to cache static assets:', error);
-    })
-  );
+  console.log('Service Worker installing.');
   self.skipWaiting();
 });
 
-// Activate event - clean up old caches
+// Activate event - claim clients immediately
 self.addEventListener('activate', (event) => {
+  console.log('Service Worker activating.');
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME && cacheName !== STATIC_CACHE && cacheName !== IMAGE_CACHE) {
+          // Delete old caches
+          if (cacheName !== CACHE_NAME && cacheName !== IMAGE_CACHE) {
             console.log('Deleting old cache:', cacheName);
             return caches.delete(cacheName);
           }
+          return null;
         })
       );
+    }).then(() => {
+      return self.clients.claim();
     })
   );
-  self.clients.claim();
 });
 
-// Fetch event - serve from cache, fallback to network
+// Fetch event - network first, fallback to cache
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
@@ -51,176 +39,118 @@ self.addEventListener('fetch', (event) => {
   // Skip non-GET requests
   if (request.method !== 'GET') return;
 
-  // Skip Chrome extension requests
-  if (url.protocol === 'chrome-extension:') return;
+  // Skip Chrome extension requests and dev server websocket
+  if (url.protocol === 'chrome-extension:' || url.pathname === '/ws') return;
 
-  // Handle API requests (don't cache)
-  if (url.pathname.startsWith('/api/') || url.hostname !== self.location.hostname) {
+  // Skip cross-origin requests except for images
+  if (url.origin !== self.location.origin && !request.destination === 'image') return;
+
+  // Handle Firebase/API requests - network only
+  if (url.hostname.includes('firebase') || 
+      url.hostname.includes('googleapis') ||
+      url.hostname.includes('openai') ||
+      url.pathname.includes('/api/')) {
     event.respondWith(
       fetch(request).catch(() => {
-        // Return offline fallback for API requests
+        // Return offline response for API failures
         return new Response(
           JSON.stringify({ error: 'You appear to be offline' }),
-          { headers: { 'Content-Type': 'application/json' } }
+          { 
+            status: 503,
+            headers: { 'Content-Type': 'application/json' } 
+          }
         );
       })
     );
     return;
   }
 
-  // Handle image requests
-  if (request.destination === 'image') {
+  // Handle image requests - cache first
+  if (request.destination === 'image' || 
+      request.url.includes('unsplash') || 
+      request.url.includes('images')) {
     event.respondWith(
-      caches.open(IMAGE_CACHE).then((cache) => {
-        return cache.match(request).then((response) => {
-          if (response) return response;
+      caches.match(request).then((response) => {
+        if (response) {
+          return response;
+        }
 
-          return fetch(request).then((response) => {
-            // Only cache successful responses
-            if (response.status === 200) {
-              cache.put(request, response.clone());
-            }
-            return response;
-          }).catch(() => {
-            // Return placeholder image for offline
-            return caches.match('/offline-image.png');
-          });
+        return fetch(request).then((response) => {
+          // Only cache successful image responses
+          if (response && response.status === 200 && response.type === 'basic') {
+            const responseToCache = response.clone();
+            caches.open(IMAGE_CACHE).then((cache) => {
+              cache.put(request, responseToCache);
+            });
+          }
+          return response;
+        }).catch(() => {
+          // Return a placeholder for failed image loads
+          return new Response('', { status: 404 });
         });
       })
     );
     return;
   }
 
-  // Handle all other requests with network-first strategy
+  // Handle app requests - network first, fallback to cache
   event.respondWith(
     fetch(request).then((response) => {
-      // Only cache successful responses
-      if (response.status === 200) {
+      // Only cache successful responses from our origin
+      if (response && response.status === 200 && response.type === 'basic') {
         const responseToCache = response.clone();
         caches.open(CACHE_NAME).then((cache) => {
-          cache.put(request, responseToCache);
+          // Don't cache the service worker itself
+          if (!request.url.includes('service-worker.js')) {
+            cache.put(request, responseToCache);
+          }
         });
       }
       return response;
     }).catch(() => {
-      // Try to serve from cache
+      // Try cache for offline support
       return caches.match(request).then((response) => {
-        if (response) return response;
-
-        // Return offline page for navigation requests
-        if (request.mode === 'navigate') {
-          return caches.match('/offline.html');
+        if (response) {
+          return response;
         }
 
-        // Return generic offline response
+        // For navigation requests, return the cached index.html
+        if (request.mode === 'navigate') {
+          return caches.match('/').then((indexResponse) => {
+            if (indexResponse) {
+              return indexResponse;
+            }
+            // Final fallback
+            return new Response(
+              '<h1>Offline</h1><p>Please check your internet connection.</p>',
+              { 
+                status: 503,
+                headers: { 'Content-Type': 'text/html' } 
+              }
+            );
+          });
+        }
+
+        // Generic offline response
         return new Response('Offline', { status: 503 });
       });
     })
   );
 });
 
-// Background sync for offline actions
+// Message event - handle skip waiting
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+});
+
+// Optional: Background sync for offline actions
 self.addEventListener('sync', (event) => {
   if (event.tag === 'sync-recipes') {
-    event.waitUntil(syncRecipes());
-  }
-});
-
-async function syncRecipes() {
-  try {
-    // Get pending operations from IndexedDB
-    const pendingOps = await getPendingOperations();
-    
-    for (const op of pendingOps) {
-      try {
-        const response = await fetch(op.url, {
-          method: op.method,
-          headers: op.headers,
-          body: op.body
-        });
-
-        if (response.ok) {
-          await removePendingOperation(op.id);
-        }
-      } catch (error) {
-        console.error('Failed to sync operation:', error);
-      }
-    }
-  } catch (error) {
-    console.error('Sync failed:', error);
-  }
-}
-
-// Helper functions for IndexedDB operations
-async function getPendingOperations() {
-  // Implementation would use IndexedDB to store pending operations
-  return [];
-}
-
-async function removePendingOperation(id) {
-  // Implementation would remove operation from IndexedDB
-}
-
-// Push notifications
-self.addEventListener('push', (event) => {
-  if (!event.data) return;
-
-  const data = event.data.json();
-  const options = {
-    body: data.body,
-    icon: '/logo192.png',
-    badge: '/badge.png',
-    vibrate: [100, 50, 100],
-    data: {
-      url: data.url || '/'
-    },
-    actions: [
-      {
-        action: 'view',
-        title: 'View Recipe',
-        icon: '/view-icon.png'
-      },
-      {
-        action: 'close',
-        title: 'Close',
-        icon: '/close-icon.png'
-      }
-    ]
-  };
-
-  event.waitUntil(
-    self.registration.showNotification(data.title, options)
-  );
-});
-
-// Notification click handler
-self.addEventListener('notificationclick', (event) => {
-  event.notification.close();
-
-  if (event.action === 'view' || !event.action) {
     event.waitUntil(
-      clients.openWindow(event.notification.data.url)
+      // Implement sync logic here if needed
+      Promise.resolve()
     );
   }
 });
-
-// Periodic background sync for fresh content
-self.addEventListener('periodicsync', (event) => {
-  if (event.tag === 'update-recipes') {
-    event.waitUntil(updateRecipesInBackground());
-  }
-});
-
-async function updateRecipesInBackground() {
-  try {
-    const response = await fetch('/api/recipes/sync');
-    if (response.ok) {
-      const data = await response.json();
-      // Update cache with fresh data
-      const cache = await caches.open(CACHE_NAME);
-      cache.put('/api/recipes', new Response(JSON.stringify(data)));
-    }
-  } catch (error) {
-    console.error('Background update failed:', error);
-  }
-}

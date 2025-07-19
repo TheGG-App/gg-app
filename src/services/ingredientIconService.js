@@ -1,330 +1,240 @@
-// src/services/ingredientIconService.js
+// src/services/ingredientIconService.js - AI-powered ingredient icon service
 import { db } from '../config/firebase';
-import { doc, setDoc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, getDocs, doc, setDoc, deleteDoc } from 'firebase/firestore';
 
 class IngredientIconService {
   constructor() {
+    this.collectionName = 'ingredientIcons';
     this.cache = new Map();
-    this.pendingRequests = new Map();
-    this.localStorageKey = 'ingredient-icons-v1';
-    this.batchQueue = [];
+    this.pendingBatch = new Set();
     this.batchTimeout = null;
-    this.loadLocalCache();
+    this.batchDelay = 2000; // 2 seconds to collect ingredients
   }
 
-  // Load cache from localStorage
-  loadLocalCache() {
-    try {
-      const stored = localStorage.getItem(this.localStorageKey);
-      if (stored) {
-        const data = JSON.parse(stored);
-        Object.entries(data).forEach(([key, value]) => {
-          this.cache.set(key, value);
-        });
-      }
-    } catch (error) {
-      console.error('Failed to load icon cache:', error);
-    }
-  }
-
-  // Save cache to localStorage
-  saveLocalCache() {
-    try {
-      const data = Object.fromEntries(this.cache);
-      localStorage.setItem(this.localStorageKey, JSON.stringify(data));
-    } catch (error) {
-      console.error('Failed to save icon cache:', error);
-    }
-  }
-
-  // Normalize ingredient for consistent caching
-  normalizeIngredient(ingredient) {
-    return ingredient
-      .toLowerCase()
-      .trim()
-      .replace(/\s+/g, ' ')
-      .replace(/[^a-z0-9\s]/g, ''); // Remove special characters
-  }
-
-  // Get icon for ingredient
-  async getIcon(ingredient, apiKey, userId = null) {
-    const normalized = this.normalizeIngredient(ingredient);
+  // Get icon for an ingredient (AI-powered with caching)
+  async getIcon(ingredient, openaiApiKey, userId) {
+    if (!ingredient || !openaiApiKey) return '🥄';
+    
+    const normalizedIngredient = this.normalizeIngredient(ingredient);
     
     // Check cache first
-    if (this.cache.has(normalized)) {
-      return this.cache.get(normalized);
-    }
-
-    // Check if we're already fetching this ingredient
-    if (this.pendingRequests.has(normalized)) {
-      return this.pendingRequests.get(normalized);
+    if (this.cache.has(normalizedIngredient)) {
+      return this.cache.get(normalizedIngredient);
     }
 
     // Check Firebase if user is logged in
     if (userId) {
-      const firebaseIcon = await this.getFromFirebase(normalized, userId);
+      const firebaseIcon = await this.getFromFirebase(normalizedIngredient, userId);
       if (firebaseIcon) {
-        this.cache.set(normalized, firebaseIcon);
-        this.saveLocalCache();
+        this.cache.set(normalizedIngredient, firebaseIcon);
         return firebaseIcon;
       }
     }
 
-    // Queue for batch processing
-    const promise = this.queueForBatch(ingredient, normalized, apiKey, userId);
-    this.pendingRequests.set(normalized, promise);
+    // Add to batch for AI processing
+    this.pendingBatch.add(normalizedIngredient);
+    this.scheduleBatchProcess(openaiApiKey, userId);
     
-    try {
-      const icon = await promise;
-      this.pendingRequests.delete(normalized);
-      return icon;
-    } catch (error) {
-      this.pendingRequests.delete(normalized);
-      return '🥄'; // Default fallback
-    }
+    // Return placeholder while processing
+    return '🥄';
   }
 
-  // Queue ingredient for batch processing
-  queueForBatch(ingredient, normalized, apiKey, userId) {
-    return new Promise((resolve, reject) => {
-      this.batchQueue.push({
-        ingredient,
-        normalized,
-        apiKey,
-        userId,
-        resolve,
-        reject
-      });
-
-      // Clear existing timeout
-      if (this.batchTimeout) {
-        clearTimeout(this.batchTimeout);
-      }
-
-      // Process batch after 100ms or when we have 10 items
-      if (this.batchQueue.length >= 10) {
-        this.processBatch();
-      } else {
-        this.batchTimeout = setTimeout(() => this.processBatch(), 100);
-      }
-    });
+  // Normalize ingredient for consistent caching
+  normalizeIngredient(ingredient) {
+    return ingredient.toLowerCase().trim()
+      .replace(/\s+/g, ' ')
+      .replace(/[0-9]+\s*(cups?|tbsp?|tsp?|lbs?|oz|g|kg|ml|l)\s*/gi, '')
+      .replace(/^\d+[\s\/]*/, '')
+      .replace(/,.*$/, '')
+      .trim();
   }
 
-  // Process batch of ingredients
-  async processBatch() {
-    if (this.batchQueue.length === 0) return;
+  // Schedule batch processing
+  scheduleBatchProcess(openaiApiKey, userId) {
+    if (this.batchTimeout) return;
+    
+    this.batchTimeout = setTimeout(() => {
+      this.processBatch(openaiApiKey, userId);
+    }, this.batchDelay);
+  }
 
-    const batch = this.batchQueue.splice(0, 10); // Take up to 10 items
-    const apiKey = batch[0].apiKey;
-    const userId = batch[0].userId;
-
-    if (!apiKey) {
-      batch.forEach(item => item.resolve('🥄'));
+  // Process a batch of ingredients with AI
+  async processBatch(openaiApiKey, userId) {
+    if (this.pendingBatch.size === 0) {
+      this.batchTimeout = null;
       return;
     }
 
+    const ingredients = Array.from(this.pendingBatch);
+    this.pendingBatch.clear();
+    this.batchTimeout = null;
+
     try {
-      const ingredients = batch.map(item => item.ingredient);
-      const icons = await this.batchGenerateIcons(ingredients, apiKey);
-      
-      // Process results
-      batch.forEach((item, index) => {
-        const icon = icons[index] || '🥄';
-        this.cache.set(item.normalized, icon);
-        
-        // Save to Firebase if user is logged in
-        if (userId) {
-          this.saveToFirebase(item.normalized, icon, item.ingredient, userId);
-        }
-        
-        item.resolve(icon);
+      const prompt = `For each ingredient below, provide ONLY the most appropriate single emoji icon. 
+Consider the main/primary ingredient, not modifiers or quantities.
+Return ONLY a JSON object with ingredient names as keys and emoji as values.
+
+Ingredients:
+${ingredients.join('\n')}
+
+Example format:
+{"chicken breast": "🍗", "garlic": "🧄", "olive oil": "🫒"}`;
+
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${openaiApiKey}`
+        },
+        body: JSON.stringify({
+          model: 'gpt-4',
+          messages: [
+            {
+              role: 'system',
+              content: 'You are a helpful assistant that assigns perfect emoji icons to cooking ingredients. Always respond with valid JSON only.'
+            },
+            {
+              role: 'user',
+              content: prompt
+            }
+          ],
+          temperature: 0.3,
+          max_tokens: 500
+        })
       });
 
-      this.saveLocalCache();
+      if (!response.ok) {
+        throw new Error('Failed to get icons from AI');
+      }
+
+      const data = await response.json();
+      const content = data.choices[0].message.content;
+      
+      try {
+        const icons = JSON.parse(content);
+        
+        // Update cache and Firebase
+        for (const [ingredient, icon] of Object.entries(icons)) {
+          this.cache.set(ingredient, icon);
+          if (userId) {
+            await this.saveToFirebase(ingredient, icon, userId);
+          }
+        }
+      } catch (parseError) {
+        console.error('Failed to parse AI response:', parseError);
+      }
     } catch (error) {
-      console.error('Batch icon generation failed:', error);
-      batch.forEach(item => item.resolve('🥄'));
+      console.error('Failed to process batch:', error);
     }
   }
 
-  // Batch generate icons using AI
-  async batchGenerateIcons(ingredients, apiKey) {
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
-      },
-      body: JSON.stringify({
-        model: 'gpt-4-turbo-preview',
-        messages: [{
-          role: 'system',
-          content: `You are a food emoji expert. For each ingredient, respond with the single most appropriate food emoji.
-          
-Rules:
-- Use specific food emojis when possible (🍗 for chicken, not 🥩)
-- For herbs use 🌿, for spices use 🧂
-- For liquids use appropriate containers (🫒 for oil, 🍯 for honey)
-- If no perfect match exists, use the closest category
-- Consider the ingredient's primary use in cooking
-- Be consistent: similar ingredients should get similar emojis`
-        }, {
-          role: 'user',
-          content: `Return ONLY a JSON array of emojis for these ingredients in the same order:
-${ingredients.map((ing, i) => `${i + 1}. ${ing}`).join('\n')}
-
-Example response: ["🍗", "🧈", "🧂", "🌿", "🧄"]`
-        }],
-        max_tokens: 200,
-        temperature: 0.1
-      })
-    });
-
-    if (!response.ok) {
-      throw new Error('AI request failed');
-    }
-
-    const data = await response.json();
-    const content = data.choices[0]?.message?.content || '[]';
-    
+  // Get icon from Firebase
+  async getFromFirebase(ingredient, userId) {
     try {
-      const emojis = JSON.parse(content);
-      return Array.isArray(emojis) ? emojis : [];
-    } catch {
-      // Try to extract emojis from the response
-      const emojiRegex = /[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/gu;
-      const matches = content.match(emojiRegex) || [];
-      return matches;
-    }
-  }
-
-  // Get from Firebase
-  async getFromFirebase(normalized, userId) {
-    try {
-      // First check user's personal mappings
-      const userDoc = await getDoc(doc(db, 'users', userId, 'ingredientIcons', normalized));
-      if (userDoc.exists()) {
-        return userDoc.data().icon;
-      }
-
-      // Then check global mappings
-      const globalDoc = await getDoc(doc(db, 'globalIngredientIcons', normalized));
-      if (globalDoc.exists()) {
-        return globalDoc.data().icon;
+      const iconDoc = doc(db, 'users', userId, this.collectionName, ingredient);
+      const snapshot = await getDocs(iconDoc);
+      if (snapshot.exists()) {
+        return snapshot.data().icon;
       }
     } catch (error) {
-      console.error('Firebase fetch error:', error);
+      console.error('Failed to get icon from Firebase:', error);
     }
     return null;
   }
 
-  // Save to Firebase
-  async saveToFirebase(normalized, icon, original, userId) {
+  // Save icon to Firebase
+  async saveToFirebase(ingredient, icon, userId) {
+    if (!userId || !ingredient || !icon) return;
+    
     try {
-      const data = {
+      const iconDoc = doc(db, 'users', userId, this.collectionName, ingredient);
+      await setDoc(iconDoc, {
+        ingredient,
         icon,
-        original,
-        normalized,
-        createdAt: new Date().toISOString(),
-        userId
-      };
-
-      // Save to user's collection
-      await setDoc(
-        doc(db, 'users', userId, 'ingredientIcons', normalized),
-        data
-      );
-
-      // Also save to global collection for sharing
-      await setDoc(
-        doc(db, 'globalIngredientIcons', normalized),
-        {
-          ...data,
-          useCount: 1,
-          lastUsed: new Date().toISOString()
-        },
-        { merge: true }
-      );
+        updatedAt: new Date().toISOString()
+      });
     } catch (error) {
-      console.error('Firebase save error:', error);
+      console.error('Failed to save icon to Firebase:', error);
     }
   }
 
-  // Bulk load icons for a recipe
-  async preloadRecipeIcons(recipe, apiKey, userId) {
-    if (!recipe.ingredients) return;
-
-    const ingredients = recipe.ingredients
-      .split('\n')
-      .filter(line => line.trim().length > 0);
-
-    // Check which ones we need to fetch
-    const needed = ingredients.filter(ing => {
-      const normalized = this.normalizeIngredient(ing);
-      return !this.cache.has(normalized);
-    });
-
-    if (needed.length === 0) return;
-
-    // Batch process all needed ingredients
-    const promises = needed.map(ing => 
-      this.getIcon(ing, apiKey, userId)
-    );
-
-    await Promise.all(promises);
-  }
-
-  // Get icon statistics
-  async getStats(userId) {
-    const stats = {
-      cacheSize: this.cache.size,
-      localIcons: this.cache.size,
-      firebaseIcons: 0
-    };
-
-    if (userId) {
-      try {
-        const snapshot = await getDocs(
-          collection(db, 'users', userId, 'ingredientIcons')
-        );
-        stats.firebaseIcons = snapshot.size;
-      } catch (error) {
-        console.error('Failed to get stats:', error);
-      }
+  // Get all custom icons from Firebase
+  async getCustomIcons(userId) {
+    if (!userId) return {};
+    
+    try {
+      const iconsCollection = collection(db, 'users', userId, this.collectionName);
+      const snapshot = await getDocs(iconsCollection);
+      
+      const customIcons = {};
+      snapshot.forEach((doc) => {
+        customIcons[doc.id] = doc.data().icon;
+      });
+      
+      return customIcons;
+    } catch (error) {
+      console.error('Error fetching custom icons:', error);
+      return {};
     }
-
-    return stats;
   }
 
-  // Clear cache
+  // Delete custom icon mapping
+  async deleteCustomIcon(userId, ingredient) {
+    if (!userId || !ingredient) return false;
+    
+    try {
+      const iconDoc = doc(db, 'users', userId, this.collectionName, ingredient);
+      await deleteDoc(iconDoc);
+      this.cache.delete(ingredient);
+      return true;
+    } catch (error) {
+      console.error('Error deleting custom icon:', error);
+      return false;
+    }
+  }
+
+  // Clear local cache
   clearCache() {
     this.cache.clear();
-    localStorage.removeItem(this.localStorageKey);
+    this.pendingBatch.clear();
+    if (this.batchTimeout) {
+      clearTimeout(this.batchTimeout);
+      this.batchTimeout = null;
+    }
   }
 
-  // Export user's mappings
+  // Get statistics
+  async getStats(userId) {
+    const localIcons = this.cache.size;
+    let firebaseIcons = 0;
+    
+    if (userId) {
+      const customIcons = await this.getCustomIcons(userId);
+      firebaseIcons = Object.keys(customIcons).length;
+    }
+    
+    return {
+      cacheSize: localIcons,
+      localIcons,
+      firebaseIcons
+    };
+  }
+
+  // Export mappings
   async exportMappings(userId) {
     const mappings = {};
     
     // Add local cache
-    this.cache.forEach((icon, key) => {
-      mappings[key] = icon;
-    });
-
-    // Add Firebase mappings if available
-    if (userId) {
-      try {
-        const snapshot = await getDocs(
-          collection(db, 'users', userId, 'ingredientIcons')
-        );
-        snapshot.forEach(doc => {
-          mappings[doc.id] = doc.data().icon;
-        });
-      } catch (error) {
-        console.error('Export error:', error);
-      }
+    for (const [ingredient, icon] of this.cache) {
+      mappings[ingredient] = icon;
     }
-
+    
+    // Add Firebase icons
+    if (userId) {
+      const customIcons = await this.getCustomIcons(userId);
+      Object.assign(mappings, customIcons);
+    }
+    
     return mappings;
   }
 }
@@ -332,4 +242,5 @@ Example response: ["🍗", "🧈", "🧂", "🌿", "🧄"]`
 // Create singleton instance
 const ingredientIconService = new IngredientIconService();
 
+// Export the instance
 export default ingredientIconService;

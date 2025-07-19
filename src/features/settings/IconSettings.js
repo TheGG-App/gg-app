@@ -1,5 +1,5 @@
 // src/features/settings/IconSettings.js
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import ingredientIconService from '../../services/ingredientIconService';
 import styles from './IconSettings.module.css';
 
@@ -11,14 +11,14 @@ function IconSettings({ userId, openaiApiKey }) {
   });
   const [isExporting, setIsExporting] = useState(false);
 
-  useEffect(() => {
-    loadStats();
-  }, [userId]);
-
-  const loadStats = async () => {
+  const loadStats = useCallback(async () => {
     const iconStats = await ingredientIconService.getStats(userId);
     setStats(iconStats);
-  };
+  }, [userId]);
+
+  useEffect(() => {
+    loadStats();
+  }, [loadStats]);
 
   const handleClearCache = () => {
     if (window.confirm('Are you sure you want to clear all cached icons? They will be regenerated as needed.')) {
