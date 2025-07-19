@@ -1,5 +1,5 @@
-// src/features/meals/MealsView.js - Modern version with filtering
-import React, { useState } from 'react';
+// src/features/meals/MealsView.js - Modern version with updated header
+import React, { useState, useEffect } from 'react';
 import MealBuilder from './components/MealBuilder';
 import FilterBar from '../../shared/components/FilterBar';
 
@@ -11,6 +11,7 @@ function MealsView({ meals, setMeals, recipes, openaiApiKey }) {
   });
   const [showMealBuilder, setShowMealBuilder] = useState(false);
   const [expandedMeal, setExpandedMeal] = useState(null);
+  const [expandedTagMenu, setExpandedTagMenu] = useState(null);
 
   const mealTypes = ['breakfast', 'lunch', 'dinner', 'snack', 'dessert', 'drinks'];
 
@@ -39,48 +40,75 @@ function MealsView({ meals, setMeals, recipes, openaiApiKey }) {
     return mealTypeMatch && familyMatch && mealPrepMatch;
   });
 
+  // Close tag menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (expandedTagMenu && !event.target.closest('.tag-menu-container')) {
+        setExpandedTagMenu(null);
+      }
+    };
+    
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [expandedTagMenu]);
+
   return (
     <div>
-      {/* Header with Create Meal Button */}
+      {/* Header Section */}
       <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
+        textAlign: 'center',
         marginBottom: '30px'
       }}>
         <h1 style={{
-          fontSize: '2.5rem',
-          color: '#8B5A3C',
-          margin: 0,
+          fontSize: '3rem',
+          color: '#1f2937',
+          margin: '0 0 15px 0',
           fontWeight: '700',
           fontFamily: 'Georgia, serif'
         }}>
-          🍽️ Your Meals ({meals.length})
+          🍽️ Your Meals
         </h1>
         
-        <button
-          onClick={() => setShowMealBuilder(!showMealBuilder)}
-          style={{
-            background: '#BF5B4B',
-            color: 'white',
-            border: 'none',
-            padding: '15px 25px',
-            borderRadius: '15px',
-            cursor: 'pointer',
-            fontWeight: '600',
-            fontSize: '1rem',
-            boxShadow: '0 4px 15px rgba(191, 91, 75, 0.3)',
-            transition: 'all 0.2s ease',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px'
-          }}
-          onMouseOver={(e) => e.target.style.transform = 'translateY(-2px)'}
-          onMouseOut={(e) => e.target.style.transform = 'translateY(0)'}
-        >
-          <span>{showMealBuilder ? '✕' : '+'}</span>
-          {showMealBuilder ? 'Cancel' : 'Create Meal'}
-        </button>
+        {/* Meal Count Box */}
+        <div style={{
+          display: 'inline-block',
+          background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
+          color: 'white',
+          borderRadius: '15px',
+          padding: '10px 20px',
+          fontSize: '1rem',
+          fontWeight: '600',
+          boxShadow: '0 4px 15px rgba(34, 197, 94, 0.3)',
+          marginBottom: '20px'
+        }}>
+          {meals.length} {meals.length === 1 ? 'meal' : 'meals'}
+        </div>
+        
+        <div>
+          <button
+            onClick={() => setShowMealBuilder(!showMealBuilder)}
+            style={{
+              background: '#BF5B4B',
+              color: 'white',
+              border: 'none',
+              padding: '15px 25px',
+              borderRadius: '15px',
+              cursor: 'pointer',
+              fontWeight: '600',
+              fontSize: '1rem',
+              boxShadow: '0 4px 15px rgba(191, 91, 75, 0.3)',
+              transition: 'all 0.2s ease',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}
+            onMouseOver={(e) => e.target.style.transform = 'translateY(-2px)'}
+            onMouseOut={(e) => e.target.style.transform = 'translateY(0)'}
+          >
+            <span>{showMealBuilder ? '✕' : '+'}</span>
+            {showMealBuilder ? 'Cancel' : 'Create Meal'}
+          </button>
+        </div>
       </div>
 
       {/* Meal Builder */}
@@ -247,32 +275,162 @@ function MealsView({ meals, setMeals, recipes, openaiApiKey }) {
                     display: 'flex',
                     gap: '10px',
                     marginBottom: '25px',
-                    flexWrap: 'wrap'
+                    flexWrap: 'wrap',
+                    position: 'relative'
                   }}>
-                    <button 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        updateMeal(meal.id, {
-                          tags: { 
-                            ...meal.tags, 
-                            familyApproved: !meal.tags?.familyApproved 
-                          }
-                        });
-                      }}
-                      style={{
-                        background: '#8B5A3C',
-                        color: 'white',
-                        border: 'none',
-                        padding: '8px 15px',
-                        borderRadius: '8px',
-                        cursor: 'pointer',
-                        fontSize: '0.9rem',
-                        fontWeight: '500'
-                      }}
-                    >
-                      🏷️ Edit Tags
-                    </button>
-                    
+                    {/* Tags with Edit Button */}
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flex: 1 }}>
+                      {meal.tags?.familyApproved && (
+                        <span style={{
+                          background: '#22c55e',
+                          color: 'white',
+                          padding: '6px 12px',
+                          borderRadius: '10px',
+                          fontSize: '0.85rem',
+                          fontWeight: '500'
+                        }}>
+                          👨‍👩‍👧‍👦 Family Approved
+                        </span>
+                      )}
+                      
+                      {meal.tags?.mealPrep && (
+                        <span style={{
+                          background: '#8B5A3C',
+                          color: 'white',
+                          padding: '6px 12px',
+                          borderRadius: '10px',
+                          fontSize: '0.85rem',
+                          fontWeight: '500'
+                        }}>
+                          🥘 Meal Prep
+                        </span>
+                      )}
+                      
+                      {/* Add Tags Button */}
+                      <div className="tag-menu-container" style={{ position: 'relative' }}>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const mealId = meal.id;
+                            setExpandedTagMenu(expandedTagMenu === mealId ? null : mealId);
+                          }}
+                          style={{
+                            background: expandedTagMenu === meal.id ? '#06b6d4' : '#f3f4f6',
+                            color: expandedTagMenu === meal.id ? 'white' : '#6b7280',
+                            border: 'none',
+                            borderRadius: '50%',
+                            width: '28px',
+                            height: '28px',
+                            cursor: 'pointer',
+                            fontSize: '0.9rem',
+                            fontWeight: 'bold',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            transition: 'all 0.2s ease'
+                          }}
+                          onMouseOver={(e) => {
+                            if (expandedTagMenu !== meal.id) {
+                              e.target.style.background = '#06b6d4';
+                              e.target.style.color = 'white';
+                              e.target.style.transform = 'scale(1.1)';
+                            }
+                          }}
+                          onMouseOut={(e) => {
+                            if (expandedTagMenu !== meal.id) {
+                              e.target.style.background = '#f3f4f6';
+                              e.target.style.color = '#6b7280';
+                              e.target.style.transform = 'scale(1)';
+                            }
+                          }}
+                        >
+                          +
+                        </button>
+
+                        {/* Tag Menu */}
+                        {expandedTagMenu === meal.id && (
+                          <div
+                            style={{
+                              position: 'absolute',
+                              top: '100%',
+                              left: '0',
+                              marginTop: '5px',
+                              background: 'white',
+                              borderRadius: '12px',
+                              minWidth: '200px',
+                              boxShadow: '0 8px 20px rgba(0, 0, 0, 0.15)',
+                              border: '1px solid #e5e7eb',
+                              zIndex: 10,
+                              padding: '12px'
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {/* Basic Tags */}
+                            <div style={{ marginBottom: '12px' }}>
+                              <div style={{
+                                fontSize: '0.7rem',
+                                fontWeight: '600',
+                                color: '#9ca3af',
+                                marginBottom: '8px',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.5px'
+                              }}>
+                                Basic Tags
+                              </div>
+                              <label style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                cursor: 'pointer',
+                                padding: '6px 0',
+                                fontSize: '0.85rem'
+                              }}>
+                                <input
+                                  type="checkbox"
+                                  checked={meal.tags?.familyApproved || false}
+                                  onChange={(e) => updateMeal(meal.id, {
+                                    tags: { ...meal.tags, familyApproved: e.target.checked }
+                                  })}
+                                  style={{ 
+                                    width: '14px', 
+                                    height: '14px',
+                                    accentColor: '#22c55e'
+                                  }}
+                                />
+                                <span style={{ color: '#374151' }}>
+                                  Family Approved
+                                </span>
+                              </label>
+                              <label style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                cursor: 'pointer',
+                                padding: '6px 0',
+                                fontSize: '0.85rem'
+                              }}>
+                                <input
+                                  type="checkbox"
+                                  checked={meal.tags?.mealPrep || false}
+                                  onChange={(e) => updateMeal(meal.id, {
+                                    tags: { ...meal.tags, mealPrep: e.target.checked }
+                                  })}
+                                  style={{ 
+                                    width: '14px', 
+                                    height: '14px',
+                                    accentColor: '#22c55e'
+                                  }}
+                                />
+                                <span style={{ color: '#374151' }}>
+                                  Meal Prep
+                                </span>
+                              </label>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    {/* Delete Button */}
                     <button 
                       onClick={(e) => {
                         e.stopPropagation();
@@ -286,7 +444,8 @@ function MealsView({ meals, setMeals, recipes, openaiApiKey }) {
                         borderRadius: '8px',
                         cursor: 'pointer',
                         fontSize: '0.9rem',
-                        fontWeight: '500'
+                        fontWeight: '500',
+                        marginLeft: 'auto'
                       }}
                     >
                       🗑️ Delete

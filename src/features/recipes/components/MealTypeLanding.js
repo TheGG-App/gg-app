@@ -1,7 +1,6 @@
-// src/features/recipes/components/MealTypeLanding.js - Updated with search and fixed hover
+// src/features/recipes/components/MealTypeLanding.js - Updated with search and grid view
 import React, { useState } from 'react';
 import { MEAL_TYPES } from '../utils/recipeUtils';
-import CompactSquareRecipeCard from './CompactSquareRecipeCard';
 
 function MealTypeLanding({ 
   onSelectMealType, 
@@ -249,19 +248,101 @@ function MealTypeLanding({
             {filteredRecipes.length > 0 ? (
               <div style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
                 gap: '20px'
               }}>
                 {filteredRecipes.map(recipe => (
-                  <CompactSquareRecipeCard
+                  <div
                     key={recipe.id}
-                    recipe={recipe}
-                    onClick={onRecipeClick}
-                    onUpdate={(id, updates) => {
-                      // Update recipe in the parent component
-                      console.log('Update recipe:', id, updates);
+                    onClick={() => onRecipeClick(recipe)}
+                    style={{
+                      background: 'white',
+                      borderRadius: '15px',
+                      overflow: 'hidden',
+                      border: '2px solid #e5e7eb',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)'
                     }}
-                  />
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.borderColor = '#06b6d4';
+                      e.currentTarget.style.transform = 'translateY(-4px)';
+                      e.currentTarget.style.boxShadow = '0 8px 20px rgba(6, 182, 212, 0.15)';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.borderColor = '#e5e7eb';
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.06)';
+                    }}
+                  >
+                    {/* Recipe Image */}
+                    <div style={{
+                      width: '100%',
+                      paddingTop: '60%',
+                      position: 'relative',
+                      background: '#f3f4f6',
+                      overflow: 'hidden'
+                    }}>
+                      {recipe.image ? (
+                        <img
+                          src={recipe.image}
+                          alt={recipe.title}
+                          style={{
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover'
+                          }}
+                          onError={(e) => {
+                            e.target.style.display = 'none';
+                            e.target.parentElement.innerHTML = '<div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; color: #9ca3af; font-size: 2rem;">🍽️</div>';
+                          }}
+                        />
+                      ) : (
+                        <div style={{ 
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          width: '100%',
+                          height: '100%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#9ca3af', 
+                          fontSize: '2rem' 
+                        }}>
+                          🍽️
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Recipe Info */}
+                    <div style={{ padding: '15px' }}>
+                      <h3 style={{
+                        margin: '0 0 8px 0',
+                        fontSize: '1.1rem',
+                        fontWeight: '600',
+                        color: '#1f2937',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap'
+                      }}>
+                        {recipe.title}
+                      </h3>
+                      <div style={{
+                        display: 'flex',
+                        gap: '12px',
+                        fontSize: '0.8rem',
+                        color: '#6b7280'
+                      }}>
+                        <span>{recipe.mealType.charAt(0).toUpperCase() + recipe.mealType.slice(1)}</span>
+                        <span>⏱️ {recipe.cookTime || 'Unknown'}</span>
+                        <span>🍽️ {recipe.nutrition?.servings || '?'} servings</span>
+                      </div>
+                    </div>
+                  </div>
                 ))}
               </div>
             ) : (
@@ -283,7 +364,7 @@ function MealTypeLanding({
           gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
           gap: '30px',
           maxWidth: '900px',
-          margin: '0 auto 60px auto'
+          margin: '0 auto'
         }}>
           {MEAL_TYPES.map(mealType => (
             <button
@@ -369,77 +450,6 @@ function MealTypeLanding({
             </button>
           ))}
         </div>
-
-        {/* Recent Recipes Section */}
-        {allRecipes.length > 0 && !searchTerm && (
-          <div style={{
-            maxWidth: '1200px',
-            margin: '0 auto'
-          }}>
-            <h2 style={{
-              fontSize: '2rem',
-              color: '#1f2937',
-              fontWeight: '700',
-              fontFamily: 'Georgia, serif',
-              textAlign: 'center',
-              marginBottom: '30px'
-            }}>
-              Recent Recipes
-            </h2>
-            
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-              gap: '25px'
-            }}>
-              {allRecipes.slice(0, 6).map(recipe => (
-                <CompactSquareRecipeCard
-                  key={recipe.id}
-                  recipe={recipe}
-                  onClick={onRecipeClick}
-                  onUpdate={(id, updates) => {
-                    // Update recipe in the parent component
-                    console.log('Update recipe:', id, updates);
-                  }}
-                />
-              ))}
-            </div>
-            
-            {allRecipes.length > 6 && (
-              <div style={{
-                textAlign: 'center',
-                marginTop: '30px'
-              }}>
-                <button
-                  onClick={() => onSelectMealType('all')}
-                  style={{
-                    background: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)',
-                    color: 'white',
-                    border: 'none',
-                    padding: '12px 24px',
-                    borderRadius: '12px',
-                    cursor: 'pointer',
-                    fontWeight: '600',
-                    fontSize: '1rem',
-                    fontFamily: 'Georgia, serif',
-                    boxShadow: '0 4px 15px rgba(6, 182, 212, 0.3)',
-                    transition: 'all 0.3s ease'
-                  }}
-                  onMouseOver={(e) => {
-                    e.target.style.transform = 'translateY(-2px)';
-                    e.target.style.boxShadow = '0 6px 20px rgba(6, 182, 212, 0.4)';
-                  }}
-                  onMouseOut={(e) => {
-                    e.target.style.transform = 'translateY(0)';
-                    e.target.style.boxShadow = '0 4px 15px rgba(6, 182, 212, 0.3)';
-                  }}
-                >
-                  View All Recipes →
-                </button>
-              </div>
-            )}
-          </div>
-        )}
       </div>
     </div>
   );

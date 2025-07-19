@@ -76,7 +76,7 @@ function SideMenu({
                 fontWeight: '700',
                 fontFamily: 'Georgia, serif'
               }}>
-                Recipe Collection
+                Girl & The Gay
               </div>
               <div style={{
                 color: 'rgba(255, 255, 255, 0.8)',

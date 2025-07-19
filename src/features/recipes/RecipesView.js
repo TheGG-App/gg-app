@@ -1,23 +1,19 @@
-// src/features/recipes/RecipesView.js - Fixed syntax error and updated layout
+// src/features/recipes/RecipesView.js - Grid-only view with updated header
 import React, { useState, useCallback } from 'react';
 import MealTypeLanding from './components/MealTypeLanding';
 import FilterBar from '../../shared/components/FilterBar';
-import CompactRecipeCard from './components/CompactRecipeCard';
 import CompactSquareRecipeCard from './components/CompactSquareRecipeCard';
 import RecipeModal from './components/RecipeModal';
-import TagEditModal from './components/TagEditModal';
 import RecipeImportConfirmation from './components/RecipeImportConfirmation';
 import { useRecipeLogic } from './hooks/useRecipeLogic';
 import { getMealTypeInfo } from './utils/recipeUtils';
 
 function RecipesView({ recipes, setRecipes, openaiApiKey }) {
-  const [viewMode, setViewMode] = useState('list'); // 'list' or 'grid'
   const [selectedMealType, setSelectedMealType] = useState(null);
   const [selectedRecipe, setSelectedRecipe] = useState(null);
   const [showRecipeModal, setShowRecipeModal] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [importInput, setImportInput] = useState('');
-  const [tagEditRecipe, setTagEditRecipe] = useState(null);
   const [showImportConfirmation, setShowImportConfirmation] = useState(false);
   const [pendingRecipe, setPendingRecipe] = useState(null);
 
@@ -39,12 +35,6 @@ function RecipesView({ recipes, setRecipes, openaiApiKey }) {
 
   // Define all callback functions using useCallback to prevent hoisting issues
   const updateRecipe = useCallback((id, updates) => {
-    // Handle special case for adding new recipes
-    if (id === 'ADD_NEW') {
-      setRecipes([...recipes, updates]);
-      return;
-    }
-    
     setRecipes(recipes.map(recipe => 
       recipe.id === id ? { ...recipe, ...updates } : recipe
     ));
@@ -153,14 +143,11 @@ function RecipesView({ recipes, setRecipes, openaiApiKey }) {
       background: 'white',
       minHeight: '100vh'
     }}>
-      {/* Compact Header */}
+      {/* Header Section */}
       <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: '20px',
-        gap: '20px',
-        padding: '15px 20px'
+        textAlign: 'center',
+        marginBottom: '30px',
+        padding: '20px'
       }}>
         <button
           onClick={() => setSelectedMealType(null)}
@@ -174,7 +161,8 @@ function RecipesView({ recipes, setRecipes, openaiApiKey }) {
             fontWeight: '600',
             fontSize: '0.9rem',
             fontFamily: 'Georgia, serif',
-            transition: 'all 0.3s ease'
+            transition: 'all 0.3s ease',
+            marginBottom: '20px'
           }}
           onMouseOver={(e) => {
             e.target.style.background = '#06b6d4';
@@ -191,18 +179,31 @@ function RecipesView({ recipes, setRecipes, openaiApiKey }) {
         </button>
 
         <h1 style={{
-          fontSize: '2rem',
+          fontSize: '3rem',
           color: '#1f2937',
-          margin: 0,
+          margin: '0 0 15px 0',
           fontWeight: '700',
-          fontFamily: 'Georgia, serif',
-          flex: 1,
-          textAlign: 'center'
+          fontFamily: 'Georgia, serif'
         }}>
-          {mealInfo.icon} {mealInfo.label} ({filteredRecipes.length})
+          {mealInfo.icon} {mealInfo.label}
         </h1>
         
-        <div style={{ position: 'relative' }}>
+        {/* Recipe Count Box */}
+        <div style={{
+          display: 'inline-block',
+          background: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)',
+          color: 'white',
+          borderRadius: '15px',
+          padding: '10px 20px',
+          fontSize: '1rem',
+          fontWeight: '600',
+          boxShadow: '0 4px 15px rgba(6, 182, 212, 0.3)'
+        }}>
+          {filteredRecipes.length} {filteredRecipes.length === 1 ? 'recipe' : 'recipes'}
+        </div>
+        
+        {/* Import Button */}
+        <div style={{ position: 'relative', display: 'inline-block', marginLeft: '20px' }}>
           <button
             onClick={() => setShowImport(true)}
             style={{
@@ -353,113 +354,22 @@ function RecipesView({ recipes, setRecipes, openaiApiKey }) {
         />
       </div>
 
-      {/* Recipe List */}
+      {/* Recipe Grid */}
       <div style={{ padding: '0 20px' }}>
         {filteredRecipes.length > 0 ? (
           <div style={{
-            background: 'white',
-            borderRadius: '20px',
-            padding: '25px',
-            boxShadow: '0 2px 15px rgba(0, 0, 0, 0.06)',
-            border: '1px solid #f0f0f0'
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+            gap: '25px'
           }}>
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: '20px',
-              paddingBottom: '15px',
-              borderBottom: '1px solid #f0f0f0'
-            }}>
-              <h2 style={{
-                margin: 0,
-                color: '#1f2937',
-                fontSize: '1.5rem',
-                fontWeight: '700',
-                fontFamily: 'Georgia, serif'
-              }}>
-                📚 Your {mealInfo.label} Collection
-              </h2>
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '15px'
-              }}>
-                <div style={{
-                  color: '#6b7280',
-                  fontSize: '0.9rem',
-                  fontWeight: '600'
-                }}>
-                  {filteredRecipes.length} recipe{filteredRecipes.length !== 1 ? 's' : ''} found
-                </div>
-                {/* View Mode Toggle */}
-                <div style={{
-                  display: 'flex',
-                  gap: '4px',
-                  background: '#f3f4f6',
-                  padding: '4px',
-                  borderRadius: '8px'
-                }}>
-                  <button
-                    onClick={() => setViewMode('list')}
-                    style={{
-                      background: viewMode === 'list' ? '#06b6d4' : 'transparent',
-                      color: viewMode === 'list' ? 'white' : '#6b7280',
-                      border: 'none',
-                      padding: '4px 12px',
-                      borderRadius: '6px',
-                      cursor: 'pointer',
-                      fontSize: '0.8rem',
-                      fontWeight: '600',
-                      transition: 'all 0.2s'
-                    }}
-                  >
-                    List
-                  </button>
-                  <button
-                    onClick={() => setViewMode('grid')}
-                    style={{
-                      background: viewMode === 'grid' ? '#06b6d4' : 'transparent',
-                      color: viewMode === 'grid' ? 'white' : '#6b7280',
-                      border: 'none',
-                      padding: '4px 12px',
-                      borderRadius: '6px',
-                      cursor: 'pointer',
-                      fontSize: '0.8rem',
-                      fontWeight: '600',
-                      transition: 'all 0.2s'
-                    }}
-                  >
-                    Grid
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Recipe Cards */}
-            <div style={viewMode === 'grid' ? {
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-              gap: '20px'
-            } : {}}>
-              {filteredRecipes.map(recipe => (
-                viewMode === 'grid' ? (
-                  <CompactSquareRecipeCard
-                    key={recipe.id}
-                    recipe={recipe}
-                    onClick={handleRecipeClick}
-                    onUpdate={updateRecipe}
-                  />
-                ) : (
-                  <CompactRecipeCard
-                    key={recipe.id}
-                    recipe={recipe}
-                    onClick={handleRecipeClick}
-                    onUpdate={updateRecipe}
-                  />
-                )
-              ))}
-            </div>
+            {filteredRecipes.map(recipe => (
+              <CompactSquareRecipeCard
+                key={recipe.id}
+                recipe={recipe}
+                onClick={handleRecipeClick}
+                onUpdate={updateRecipe}
+              />
+            ))}
           </div>
         ) : (
           <div style={{
@@ -523,18 +433,6 @@ function RecipesView({ recipes, setRecipes, openaiApiKey }) {
         onConfirm={handleConfirmImport}
         onCancel={handleCancelImport}
       />
-
-      {/* Tag Edit Modal */}
-      {tagEditRecipe && (
-        <TagEditModal
-          recipe={tagEditRecipe}
-          onUpdate={(updates) => {
-            updateRecipe(tagEditRecipe.id, updates);
-            setTagEditRecipe(null);
-          }}
-          onClose={() => setTagEditRecipe(null)}
-        />
-      )}
     </div>
   );
 }
