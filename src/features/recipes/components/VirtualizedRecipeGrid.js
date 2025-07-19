@@ -1,4 +1,4 @@
-// src/features/recipes/components/VirtualizedRecipeGrid.js - Final Fixed Version
+// src/features/recipes/components/VirtualizedRecipeGrid.js - Final Clean Version
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { VariableSizeGrid as Grid } from 'react-window';
 import InfiniteLoader from 'react-window-infinite-loader';
