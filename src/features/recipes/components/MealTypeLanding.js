@@ -1,10 +1,10 @@
-// src/features/recipes/components/MealTypeLanding.js - Updated with search and grid view
+// src/features/recipes/components/MealTypeLanding.js - Fixed with null checks
 import React, { useState } from 'react';
 import { MEAL_TYPES } from '../utils/recipeUtils';
 
 function MealTypeLanding({ 
   onSelectMealType, 
-  recipes, 
+  recipes = [], // Default to empty array
   showImport, 
   setShowImport, 
   importInput, 
@@ -12,22 +12,28 @@ function MealTypeLanding({
   isImporting, 
   openaiApiKey, 
   handleImportClick,
-  allRecipes,
+  allRecipes = [], // Default to empty array
   onRecipeClick
 }) {
   const [searchTerm, setSearchTerm] = useState('');
   
+  // Add null check for recipes
+  const safeRecipes = recipes || [];
+  const safeAllRecipes = allRecipes || [];
+  
   const getRecipeCount = (mealType) => {
-    if (mealType === 'all') return recipes.length;
-    return recipes.filter(recipe => recipe.mealType === mealType).length;
+    if (mealType === 'all') return safeRecipes.length;
+    return safeRecipes.filter(recipe => recipe.mealType === mealType).length;
   };
 
-  // Filter recipes based on search
+  // Filter recipes based on search with null check
   const filteredRecipes = searchTerm 
-    ? allRecipes.filter(recipe =>
-        recipe.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        recipe.ingredients.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        recipe.mealType.toLowerCase().includes(searchTerm.toLowerCase())
+    ? safeAllRecipes.filter(recipe =>
+        recipe && recipe.title && recipe.ingredients && recipe.mealType && (
+          recipe.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          recipe.ingredients.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          recipe.mealType.toLowerCase().includes(searchTerm.toLowerCase())
+        )
       )
     : [];
 
@@ -60,80 +66,133 @@ function MealTypeLanding({
             color: 'white',
             border: 'none',
             padding: '15px 25px',
-            borderRadius: '15px',
+            borderRadius: '12px',
             cursor: 'pointer',
             fontWeight: '600',
             fontSize: '1rem',
-            fontFamily: 'Georgia, serif',
-            boxShadow: '0 4px 15px rgba(6, 182, 212, 0.3)',
-            transition: 'all 0.3s ease'
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            boxShadow: '0 6px 20px rgba(6, 182, 212, 0.3)',
+            transition: 'all 0.2s ease'
           }}
           onMouseOver={(e) => {
-            e.target.style.transform = 'translateY(-2px)';
-            e.target.style.boxShadow = '0 6px 20px rgba(6, 182, 212, 0.4)';
+            e.currentTarget.style.transform = 'translateY(-2px)';
+            e.currentTarget.style.boxShadow = '0 8px 25px rgba(6, 182, 212, 0.4)';
           }}
           onMouseOut={(e) => {
-            e.target.style.transform = 'translateY(0)';
-            e.target.style.boxShadow = '0 4px 15px rgba(6, 182, 212, 0.3)';
+            e.currentTarget.style.transform = 'translateY(0)';
+            e.currentTarget.style.boxShadow = '0 6px 20px rgba(6, 182, 212, 0.3)';
           }}
         >
-          + Import Recipe
+          <span style={{ fontSize: '1.2rem' }}>✨</span>
+          Import Recipe
         </button>
-        
-        {/* AI Import Modal - Right Below Import Button */}
-        {showImport && (
-          <div style={{
-            position: 'absolute',
-            top: '100%',
-            right: '0',
-            marginTop: '10px',
-            background: 'white',
-            borderRadius: '15px',
-            padding: '20px',
-            boxShadow: '0 8px 25px rgba(6, 182, 212, 0.3)',
-            border: '2px solid #06b6d4',
-            minWidth: '400px',
-            maxWidth: '500px'
-          }}>
-            <textarea
-              placeholder="Paste recipe URL (https://...) or raw recipe text here..."
-              value={importInput}
-              onChange={(e) => setImportInput(e.target.value)}
-              disabled={isImporting}
-              style={{
-                width: '100%',
-                minHeight: '100px',
-                padding: '12px',
-                borderRadius: '8px',
-                border: '2px solid #06b6d4',
-                fontSize: '0.9rem',
-                outline: 'none',
-                background: 'white',
-                marginBottom: '15px',
-                resize: 'vertical',
-                fontFamily: 'Georgia, serif',
-                boxSizing: 'border-box'
-              }}
-            />
+      </div>
+
+      {/* Import Modal */}
+      {showImport && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0, left: 0, right: 0, bottom: 0,
+            background: 'rgba(0, 0, 0, 0.5)',
+            zIndex: 1001,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px'
+          }}
+          onClick={() => setShowImport(false)}
+        >
+          <div
+            style={{
+              background: 'white',
+              borderRadius: '20px',
+              padding: '30px',
+              maxWidth: '500px',
+              width: '100%',
+              boxShadow: '0 20px 40px rgba(0, 0, 0, 0.2)'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 style={{
+              margin: '0 0 20px 0',
+              fontSize: '1.8rem',
+              fontWeight: '700',
+              color: '#1f2937',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px'
+            }}>
+              <span>✨</span>
+              Import a Recipe
+            </h2>
             
-            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{
+                display: 'block',
+                marginBottom: '8px',
+                fontSize: '0.95rem',
+                fontWeight: '600',
+                color: '#4b5563'
+              }}>
+                Recipe URL or Text
+              </label>
+              <textarea
+                value={importInput}
+                onChange={(e) => setImportInput(e.target.value)}
+                placeholder="Paste a recipe URL (e.g., from AllRecipes, Food Network) or paste recipe text..."
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  borderRadius: '10px',
+                  border: '2px solid #e5e7eb',
+                  fontSize: '0.95rem',
+                  resize: 'vertical',
+                  minHeight: '100px',
+                  fontFamily: 'inherit',
+                  outline: 'none'
+                }}
+                onFocus={(e) => e.target.style.borderColor = '#06b6d4'}
+                onBlur={(e) => e.target.style.borderColor = '#e5e7eb'}
+              />
+            </div>
+
+            {!openaiApiKey && (
+              <div style={{
+                marginBottom: '20px',
+                padding: '12px',
+                background: '#fef2f2',
+                border: '1px solid #fecaca',
+                borderRadius: '8px',
+                color: '#dc2626',
+                fontSize: '0.85rem'
+              }}>
+                ⚠️ OpenAI API key required for recipe import. Add it in Settings.
+              </div>
+            )}
+
+            <div style={{
+              display: 'flex',
+              gap: '10px',
+              justifyContent: 'flex-end'
+            }}>
               <button
                 onClick={() => setShowImport(false)}
                 style={{
-                  background: '#6b7280',
-                  color: 'white',
+                  background: '#f3f4f6',
+                  color: '#6b7280',
                   border: 'none',
-                  padding: '8px 16px',
+                  padding: '10px 20px',
                   borderRadius: '8px',
                   cursor: 'pointer',
                   fontWeight: '600',
-                  fontSize: '0.9rem',
-                  fontFamily: 'Georgia, serif'
+                  fontSize: '0.95rem'
                 }}
               >
                 Cancel
               </button>
-              
               <button
                 onClick={handleImportClick}
                 disabled={isImporting || !importInput.trim() || !openaiApiKey}
@@ -143,204 +202,176 @@ function MealTypeLanding({
                     : 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)',
                   color: 'white',
                   border: 'none',
-                  padding: '8px 16px',
+                  padding: '10px 20px',
                   borderRadius: '8px',
                   cursor: isImporting || !importInput.trim() || !openaiApiKey ? 'not-allowed' : 'pointer',
                   fontWeight: '600',
-                  fontSize: '0.9rem',
-                  fontFamily: 'Georgia, serif'
+                  fontSize: '0.95rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
                 }}
               >
-                {isImporting ? '🔄 Importing...' : '✨ Import'}
+                {isImporting ? (
+                  <>
+                    <span style={{
+                      display: 'inline-block',
+                      width: '14px',
+                      height: '14px',
+                      border: '2px solid rgba(255, 255, 255, 0.3)',
+                      borderTopColor: 'white',
+                      borderRadius: '50%',
+                      animation: 'spin 0.8s linear infinite'
+                    }} />
+                    Importing...
+                  </>
+                ) : (
+                  <>✨ Import</>
+                )}
               </button>
             </div>
-
-            {!openaiApiKey && (
-              <div style={{
-                marginTop: '10px',
-                padding: '8px',
-                background: 'rgba(239, 68, 68, 0.1)',
-                border: '1px solid #ef4444',
-                borderRadius: '6px',
-                color: '#dc2626',
-                fontSize: '0.8rem'
-              }}>
-                ⚠️ OpenAI API key required for recipe import
-              </div>
-            )}
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Main Content */}
       <div style={{
-        padding: '40px',
+        padding: '60px 20px 40px',
         maxWidth: '1200px',
         margin: '0 auto'
       }}>
-        {/* Title Only */}
-        <h1 style={{
-          fontSize: '3rem',
-          background: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 30%, #0369a1 60%, #075985 100%)',
-          WebkitBackgroundClip: 'text',
-          WebkitTextFillColor: 'transparent',
-          margin: '0 0 30px 0',
-          fontWeight: '900',
-          fontFamily: 'Georgia, serif',
-          textAlign: 'center'
+        {/* Title */}
+        <div style={{
+          textAlign: 'center',
+          marginBottom: '40px'
         }}>
-          G&G Recipe Collection
-        </h1>
+          <h1 style={{
+            fontSize: '3.5rem',
+            fontWeight: '900',
+            margin: '0 0 10px 0',
+            background: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            fontFamily: 'Georgia, serif'
+          }}>
+            Girl & The Gay
+          </h1>
+          <p style={{
+            fontSize: '1.3rem',
+            color: '#6b7280',
+            margin: 0
+          }}>
+            What are we cooking today? 👨‍🍳
+          </p>
+        </div>
 
         {/* Search Bar */}
         <div style={{
           maxWidth: '600px',
-          margin: '0 auto 40px auto'
+          margin: '0 auto 40px',
+          position: 'relative'
         }}>
           <input
             type="text"
-            placeholder="Search all recipes by name, ingredient, or type..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Search all recipes..."
             style={{
               width: '100%',
-              padding: '12px 20px',
-              borderRadius: '15px',
+              padding: '16px 50px 16px 20px',
+              fontSize: '1.1rem',
               border: '2px solid #e5e7eb',
-              fontSize: '1rem',
+              borderRadius: '50px',
               outline: 'none',
-              background: 'white',
-              fontFamily: 'Georgia, serif',
-              boxSizing: 'border-box',
-              transition: 'all 0.2s',
-              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)'
+              transition: 'all 0.2s ease',
+              fontFamily: 'inherit'
             }}
             onFocus={(e) => {
               e.target.style.borderColor = '#06b6d4';
-              e.target.style.boxShadow = '0 4px 12px rgba(6, 182, 212, 0.15)';
+              e.target.style.boxShadow = '0 0 0 3px rgba(6, 182, 212, 0.1)';
             }}
             onBlur={(e) => {
               e.target.style.borderColor = '#e5e7eb';
-              e.target.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.04)';
+              e.target.style.boxShadow = 'none';
             }}
           />
+          <span style={{
+            position: 'absolute',
+            right: '20px',
+            top: '50%',
+            transform: 'translateY(-50%)',
+            fontSize: '1.3rem'
+          }}>
+            🔍
+          </span>
         </div>
 
         {/* Search Results */}
         {searchTerm && (
           <div style={{
             marginBottom: '40px',
-            background: 'white',
+            background: '#f9fafb',
             borderRadius: '20px',
-            padding: '25px',
-            boxShadow: '0 4px 15px rgba(0, 0, 0, 0.08)',
-            border: '1px solid #f0f0f0'
+            padding: '30px',
+            border: '1px solid #e5e7eb'
           }}>
-            <h2 style={{
+            <h3 style={{
               margin: '0 0 20px 0',
-              fontSize: '1.5rem',
-              color: '#1f2937',
-              fontWeight: '700'
+              fontSize: '1.3rem',
+              color: '#1f2937'
             }}>
               Search Results ({filteredRecipes.length})
-            </h2>
+            </h3>
             
             {filteredRecipes.length > 0 ? (
               <div style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
                 gap: '20px'
               }}>
                 {filteredRecipes.map(recipe => (
                   <div
                     key={recipe.id}
-                    onClick={() => onRecipeClick(recipe)}
+                    onClick={() => onRecipeClick && onRecipeClick(recipe)}
                     style={{
                       background: 'white',
-                      borderRadius: '15px',
-                      overflow: 'hidden',
-                      border: '2px solid #e5e7eb',
+                      borderRadius: '12px',
+                      padding: '20px',
+                      border: '1px solid #e5e7eb',
                       cursor: 'pointer',
-                      transition: 'all 0.2s',
-                      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)'
+                      transition: 'all 0.2s ease'
                     }}
                     onMouseOver={(e) => {
-                      e.currentTarget.style.borderColor = '#06b6d4';
-                      e.currentTarget.style.transform = 'translateY(-4px)';
-                      e.currentTarget.style.boxShadow = '0 8px 20px rgba(6, 182, 212, 0.15)';
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.1)';
                     }}
                     onMouseOut={(e) => {
-                      e.currentTarget.style.borderColor = '#e5e7eb';
                       e.currentTarget.style.transform = 'translateY(0)';
-                      e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.06)';
+                      e.currentTarget.style.boxShadow = 'none';
                     }}
                   >
-                    {/* Recipe Image */}
-                    <div style={{
-                      width: '100%',
-                      paddingTop: '60%',
-                      position: 'relative',
-                      background: '#f3f4f6',
-                      overflow: 'hidden'
+                    <h4 style={{
+                      margin: '0 0 8px 0',
+                      fontSize: '1.1rem',
+                      color: '#1f2937'
                     }}>
-                      {recipe.image ? (
-                        <img
-                          src={recipe.image}
-                          alt={recipe.title}
-                          style={{
-                            position: 'absolute',
-                            top: 0,
-                            left: 0,
-                            width: '100%',
-                            height: '100%',
-                            objectFit: 'cover'
-                          }}
-                          onError={(e) => {
-                            e.target.style.display = 'none';
-                            e.target.parentElement.innerHTML = '<div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; color: #9ca3af; font-size: 2rem;">🍽️</div>';
-                          }}
-                        />
-                      ) : (
-                        <div style={{ 
-                          position: 'absolute',
-                          top: 0,
-                          left: 0,
-                          width: '100%',
-                          height: '100%',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: '#9ca3af', 
-                          fontSize: '2rem' 
-                        }}>
-                          🍽️
-                        </div>
+                      {recipe.title}
+                    </h4>
+                    <div style={{
+                      display: 'flex',
+                      gap: '15px',
+                      fontSize: '0.85rem',
+                      color: '#6b7280'
+                    }}>
+                      <span>{MEAL_TYPES.find(m => m.key === recipe.mealType)?.label || recipe.mealType}</span>
+                      <span>•</span>
+                      <span>{recipe.cookTime || 'Time not set'}</span>
+                      {recipe.nutrition?.servings && (
+                        <>
+                          <span>•</span>
+                          <span>{recipe.nutrition.servings} servings</span>
+                        </>
                       )}
-                    </div>
-                    
-                    {/* Recipe Info */}
-                    <div style={{ padding: '15px' }}>
-                      <h3 style={{
-                        margin: '0 0 8px 0',
-                        fontSize: '1.1rem',
-                        fontWeight: '600',
-                        color: '#1f2937',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap'
-                      }}>
-                        {recipe.title}
-                      </h3>
-                      <div style={{
-                        display: 'flex',
-                        gap: '12px',
-                        fontSize: '0.8rem',
-                        color: '#6b7280'
-                      }}>
-                        <span>{recipe.mealType.charAt(0).toUpperCase() + recipe.mealType.slice(1)}</span>
-                        <span>⏱️ {recipe.cookTime || 'Unknown'}</span>
-                        <span>🍽️ {recipe.nutrition?.servings || '?'} servings</span>
-                      </div>
                     </div>
                   </div>
                 ))}
@@ -395,7 +426,7 @@ function MealTypeLanding({
                 button.style.boxShadow = '0 6px 20px rgba(6, 182, 212, 0.15)';
               }}
             >
-              {/* Food Image - No emoji overlay */}
+              {/* Food Image */}
               <div style={{
                 width: '100%',
                 height: '180px',
@@ -451,6 +482,14 @@ function MealTypeLanding({
           ))}
         </div>
       </div>
+
+      {/* CSS for spin animation */}
+      <style jsx>{`
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
   );
 }
