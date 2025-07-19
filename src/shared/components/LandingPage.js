@@ -1,180 +1,77 @@
-// src/shared/components/LandingPage.js
+// src/shared/components/LandingPage.js - Logo only
 import React from 'react';
 
-function LandingPage({ setCurrentView }) {
+function LandingPage({ setCurrentView, user, onSignIn }) {
   return (
     <div style={{
+      minHeight: '100vh',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
       background: 'white',
-      borderRadius: '25px',
-      padding: '40px',
-      boxShadow: '0 12px 40px rgba(139, 90, 60, 0.15)',
-      border: '2px solid #EEB182',
-      textAlign: 'center',
-      maxWidth: '1000px',
-      margin: '0 auto'
+      padding: '20px'
     }}>
-      {/* Logo Section */}
-      <div style={{ marginBottom: '50px' }}>
-        <div style={{
-          width: '300px',
-          height: '300px',
-          margin: '0 auto 30px auto',
-          backgroundImage: 'url("data:image/svg+xml;base64,INSERT_YOUR_LOGO_BASE64_HERE")',
-          backgroundSize: 'contain',
-          backgroundRepeat: 'no-repeat',
-          backgroundPosition: 'center'
-        }}>
-          {/* Fallback G&G text if logo doesn't load */}
-          <div style={{
+      <div style={{
+        textAlign: 'center',
+        cursor: 'pointer'
+      }}
+      onClick={() => user && setCurrentView('recipes')}
+      >
+        {/* Logo Only */}
+        <img 
+          src="/logo.png" // Update this with your logo path
+          alt="G&G Recipe Collection"
+          style={{
+            maxWidth: '400px',
             width: '100%',
-            height: '100%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '4rem',
-            background: 'linear-gradient(135deg, var(--brown-dark) 0%, var(--brown-medium) 30%, var(--plum) 60%, var(--pink) 100%)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            fontWeight: '900',
-            fontFamily: 'Georgia, serif'
-          }}>
-            G&G
-          </div>
-        </div>
+            height: 'auto'
+          }}
+        />
         
-        <p style={{
-          fontSize: '1.3rem',
-          color: '#8B5A3C',
-          margin: '0 0 15px 0',
-          fontWeight: '600',
-          letterSpacing: '2px'
-        }}>
-          Girl and The Gay
-        </p>
-        <p style={{
-          fontSize: '1.1rem',
-          color: '#666',
-          margin: 0,
-          opacity: 0.8
-        }}>
-          💅 Your sassy AI-powered kitchen companion
-        </p>
-      </div>
-
-      {/* Main Navigation Buttons */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-        gap: '25px',
-        marginBottom: '50px',
-        maxWidth: '600px',
-        margin: '0 auto 50px auto'
-      }}>
-        {/* Browse Recipes Button */}
-        <button
-          onClick={() => setCurrentView('recipes')}
-          style={{
-            background: '#8B5A3C',
-            color: 'white',
-            border: 'none',
-            borderRadius: '20px',
-            padding: '30px',
-            cursor: 'pointer',
-            textAlign: 'center',
-            boxShadow: '0 8px 25px rgba(139, 90, 60, 0.3)',
-            transition: 'transform 0.2s ease',
-            position: 'relative',
-            overflow: 'hidden'
-          }}
-          onMouseOver={(e) => e.target.style.transform = 'translateY(-5px)'}
-          onMouseOut={(e) => e.target.style.transform = 'translateY(0)'}
-        >
-          {/* Top accent bar */}
+        {/* Sign In Prompt (if not signed in) */}
+        {!user && (
           <div style={{
-            position: 'absolute',
-            top: 0, left: 0, right: 0,
-            height: '4px',
-            background: '#EEB182'
-          }} />
-          
-          <div style={{ fontSize: '3rem', marginBottom: '15px' }}>🍳</div>
-          <h3 style={{
-            margin: '0 0 10px 0',
-            fontSize: '1.4rem',
-            fontWeight: '700'
+            marginTop: '60px'
           }}>
-            Browse Recipes
-          </h3>
-          <p style={{
-            margin: 0,
-            fontSize: '1rem',
-            opacity: 0.9,
-            lineHeight: '1.4'
-          }}>
-            Explore your collection of delicious recipes
-          </p>
-        </button>
-
-        {/* Plan Meals Button */}
-        <button
-          onClick={() => setCurrentView('meals')}
-          style={{
-            background: '#BF5B4B',
-            color: 'white',
-            border: 'none',
-            borderRadius: '20px',
-            padding: '30px',
-            cursor: 'pointer',
-            textAlign: 'center',
-            boxShadow: '0 8px 25px rgba(191, 91, 75, 0.3)',
-            transition: 'transform 0.2s ease',
-            position: 'relative',
-            overflow: 'hidden'
-          }}
-          onMouseOver={(e) => e.target.style.transform = 'translateY(-5px)'}
-          onMouseOut={(e) => e.target.style.transform = 'translateY(0)'}
-        >
-          {/* Top accent bar */}
-          <div style={{
-            position: 'absolute',
-            top: 0, left: 0, right: 0,
-            height: '4px',
-            background: '#CA8462'
-          }} />
-          
-          <div style={{ fontSize: '3rem', marginBottom: '15px' }}>🍽️</div>
-          <h3 style={{
-            margin: '0 0 10px 0',
-            fontSize: '1.4rem',
-            fontWeight: '700'
-          }}>
-            Plan Meals
-          </h3>
-          <p style={{
-            margin: 0,
-            fontSize: '1rem',
-            opacity: 0.9,
-            lineHeight: '1.4'
-          }}>
-            Create fabulous meal combinations
-          </p>
-        </button>
-      </div>
-
-      {/* Footer */}
-      <div style={{
-        marginTop: '60px',
-        padding: '20px 0',
-        borderTop: '1px solid rgba(139, 90, 60, 0.2)'
-      }}>
-        <p style={{
-          margin: 0,
-          fontSize: '0.9rem',
-          color: '#666',
-          opacity: 0.7
-        }}>
-          Made with love for fabulous home cooks ✨
-        </p>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onSignIn();
+              }}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                background: 'linear-gradient(135deg, #4285f4 0%, #3367d6 100%)',
+                color: 'white',
+                border: 'none',
+                padding: '12px 24px',
+                borderRadius: '12px',
+                cursor: 'pointer',
+                fontWeight: '600',
+                fontSize: '1rem',
+                boxShadow: '0 4px 15px rgba(66, 133, 244, 0.3)',
+                transition: 'all 0.3s ease'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.transform = 'translateY(-2px)';
+                e.currentTarget.style.boxShadow = '0 6px 20px rgba(66, 133, 244, 0.4)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 4px 15px rgba(66, 133, 244, 0.3)';
+              }}
+            >
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                <path fillRule="evenodd" clipRule="evenodd" d="M17.64 9.20443C17.64 8.56625 17.5827 7.95262 17.4764 7.36353H9V10.8449H13.8436C13.635 11.9699 13.0009 12.9231 12.0477 13.5613V15.8194H14.9564C16.6582 14.2526 17.64 11.9453 17.64 9.20443Z" fill="white"/>
+                <path fillRule="evenodd" clipRule="evenodd" d="M9 18C11.43 18 13.4673 17.1941 14.9564 15.8195L12.0477 13.5613C11.2418 14.1013 10.2109 14.4204 9 14.4204C6.65591 14.4204 4.67182 12.8372 3.96409 10.71H0.957275V13.0418C2.43818 15.9831 5.48182 18 9 18Z" fill="white"/>
+                <path fillRule="evenodd" clipRule="evenodd" d="M3.96409 10.7101C3.78409 10.1701 3.68182 9.59325 3.68182 9.00007C3.68182 8.40689 3.78409 7.83007 3.96409 7.29007V4.95825H0.957273C0.347727 6.17325 0 7.54755 0 9.00007C0 10.4526 0.347727 11.8269 0.957273 13.0419L3.96409 10.7101Z" fill="white"/>
+                <path fillRule="evenodd" clipRule="evenodd" d="M9 3.57955C10.3214 3.57955 11.5077 4.03364 12.4405 4.92545L15.0218 2.34409C13.4632 0.891818 11.4259 0 9 0C5.48182 0 2.43818 2.01682 0.957275 4.95818L3.96409 7.29C4.67182 5.16273 6.65591 3.57955 9 3.57955Z" fill="white"/>
+              </svg>
+              Sign in with Google
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

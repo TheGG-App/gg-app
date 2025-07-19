@@ -1,5 +1,42 @@
-// src/shared/utils/aiHelpers.js - Fixed to ONLY detect cook time, NO auto-assignment of method tags
+// src/shared/utils/aiHelpers.js - Fixed syntax error and updated with recipe title cleaning
 import { extractLargestImage } from './imageExtractor';
+
+// Function to clean recipe titles by removing buzz words
+function cleanRecipeTitle(title) {
+  if (!title || typeof title !== 'string') return title;
+  
+  // List of buzz words to remove (case insensitive)
+  const buzzWords = [
+    'recipe', 'recipes',
+    'easy', 'simple', 'quick', 'fast', 'instant',
+    'classic', 'traditional', 'authentic', 'original',
+    'best', 'perfect', 'ultimate', 'amazing', 'delicious',
+    'homemade', 'fresh', 'healthy', 'low-carb', 'keto',
+    'vegan', 'vegetarian', 'gluten-free',
+    'crispy', 'creamy', 'tender', 'fluffy', 'moist',
+    'one-pot', 'sheet-pan', 'slow-cooker', 'instant-pot',
+    'copycat', 'restaurant-style'
+  ];
+  
+  // Split title into words
+  let words = title.trim().split(/\s+/);
+  
+  // Remove buzz words (case insensitive)
+  words = words.filter(word => {
+    const cleanWord = word.toLowerCase().replace(/[^\w]/g, '');
+    return !buzzWords.includes(cleanWord);
+  });
+  
+  // Join back together and clean up
+  let cleanTitle = words.join(' ').trim();
+  
+  // Handle edge cases where title becomes empty or too short
+  if (cleanTitle.length < 3 || !cleanTitle) {
+    return title; // Return original if cleaning made it too short
+  }
+  
+  return cleanTitle;
+}
 
 export async function parseRecipeFromUrl(url, apiKey) {
   // Try to fetch the actual page content with timeout
@@ -54,6 +91,7 @@ ${imageNote}
 2. NEVER auto-assign ANY tags - ALL tags must be false
 3. User MUST manually assign ALL tags and meal types
 4. ONLY detect cook time - nothing else
+5. CLEAN the recipe title by removing buzz words like "Easy", "Classic", "Fast", "Recipe"
 
 Return the data as a JSON object with this EXACT structure:
 
@@ -95,6 +133,13 @@ CRITICAL INSTRUCTIONS - NO AUTO-ASSIGNMENT:
 6. stove: ALWAYS false (user must manually assign)
 7. slowCooker: ALWAYS false (user must manually assign)
 8. microwave: ALWAYS false (user must manually assign)
+
+TITLE CLEANING:
+1. Remove buzz words like "Easy", "Classic", "Fast", "Recipe", "Best", "Perfect", "Ultimate", "Quick", "Simple"
+2. Example: "Easy Goulash Recipe" becomes "Goulash"
+3. Example: "Classic Meatloaf Recipe" becomes "Meatloaf"
+4. Example: "Quick Chicken Teriyaki" becomes "Chicken Teriyaki"
+5. Keep the essence of the dish name, remove marketing words
 
 COOK TIME EXTRACTION (ONLY):
 1. Look for actual cook time in the page content first (phrases like "Cook time:", "Total time:", "Prep + Cook:")
@@ -148,6 +193,11 @@ OTHER INSTRUCTIONS:
     // Validate required fields
     if (!parsedRecipe.title || !parsedRecipe.ingredients || !parsedRecipe.instructions) {
       throw new Error('Incomplete recipe data from AI');
+    }
+
+    // Clean the recipe title
+    if (parsedRecipe.title) {
+      parsedRecipe.title = cleanRecipeTitle(parsedRecipe.title);
     }
 
     // Ensure we have a cook time
@@ -230,6 +280,11 @@ Return the data as a JSON object with this EXACT structure:
   }
 }
 
+TITLE CLEANING:
+1. Remove buzz words like "Easy", "Classic", "Fast", "Recipe", "Best", "Perfect", "Ultimate", "Quick", "Simple"
+2. Example: "Easy Goulash Recipe" becomes "Goulash"
+3. Example: "Classic Meatloaf Recipe" becomes "Meatloaf"
+
 CRITICAL - ALWAYS set ALL tags to false. NO AUTO-ASSIGNMENT of any tags.
 Follow the same enhanced nutrition extraction as URL parsing.
 Return ONLY the JSON object, no other text.`
@@ -256,6 +311,11 @@ Return ONLY the JSON object, no other text.`
     
     if (!parsedRecipe.title || !parsedRecipe.ingredients || !parsedRecipe.instructions) {
       throw new Error('Incomplete recipe data from AI');
+    }
+
+    // Clean the recipe title
+    if (parsedRecipe.title) {
+      parsedRecipe.title = cleanRecipeTitle(parsedRecipe.title);
     }
 
     if (!parsedRecipe.cookTime) {
@@ -306,84 +366,168 @@ async function generateRecipeImage(recipeTitle, apiKey) {
 
 // Enhanced scaling function with "Adjust" branding
 export async function scaleWithAI(item, targetServings, apiKey, isMeal = false, saveScaled = false) {
+  // Debug API key
+  console.log('Scale API Key:', apiKey ? 'sk-...' + apiKey.slice(-4) : 'Not provided');
+  
+  // Validate API key
+  if (!apiKey || !apiKey.trim()) {
+    throw new Error('OpenAI API key is required');
+  }
+  
+  const trimmedApiKey = apiKey.trim();
+  if (!trimmedApiKey.startsWith('sk-')) {
+    throw new Error('Invalid API key format. OpenAI API keys should start with "sk-"');
+  }
+
   const currentServings = parseInt(item.nutrition?.servings) || 1;
   const scaleFactor = targetServings / currentServings;
 
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`
-    },
-    body: JSON.stringify({
-      model: 'gpt-3.5-turbo',
-      messages: [{
-        role: 'user',
-        content: `Adjust this ${isMeal ? 'meal' : 'recipe'} from ${currentServings} servings to ${targetServings} servings.
+  console.log('Scaling recipe:', item.title, 'from', currentServings, 'to', targetServings);
 
-Current ${isMeal ? 'Meal' : 'Recipe'}:
-Title: ${item.title}
-Ingredients: ${item.ingredients}
-Instructions: ${item.instructions}
-Current Nutrition: ${JSON.stringify(item.nutrition)}
-
-Adjustment factor: ${scaleFactor}x
-
-Return a JSON object with the EXACT same structure but with adjusted quantities:
-
-{
-  "title": "${saveScaled ? `${item.title} (${targetServings} servings)` : item.title}",
-  "ingredients": "adjusted ingredient 1\\nadjusted ingredient 2",
-  "instructions": "updated instruction 1\\nupdated instruction 2", 
-  "mealType": "${item.mealType}",
-  "cookTime": "${item.cookTime}",
-  "cookTimeAIGenerated": ${item.cookTimeAIGenerated || false},
-  "sourceUrl": ${item.sourceUrl ? `"${item.sourceUrl}"` : "null"},
-  "image": ${item.image ? `"${item.image}"` : "null"},
-  "images": [],
-  "nutrition": {
-    "calories": "adjusted_value",
-    "protein": "adjusted_value",
-    "carbs": "adjusted_value", 
-    "fat": "adjusted_value",
-    "fiber": "adjusted_value",
-    "servings": "${targetServings}"
-  },
-  "tags": ${JSON.stringify(item.tags)},
-  "isScaledPreview": ${!saveScaled},
-  "originalId": ${saveScaled ? 'null' : item.id}
-}
-
-Adjust ALL ingredient quantities proportionally. Update cooking times in instructions if needed for larger/smaller batches.
-Ensure all nutrition values are properly adjusted.
-Return ONLY the JSON object.`
-      }],
-      max_tokens: 1500,
-      temperature: 0.1
-    })
-  });
-
-  if (!response.ok) {
-    throw new Error(`OpenAI API error: ${response.status}`);
-  }
-
-  const result = await response.json();
-  const content = result.choices[0].message.content;
+  // Truncate long content to avoid token limits
+  const MAX_INGREDIENT_LENGTH = 2000;
+  const MAX_INSTRUCTION_LENGTH = 2000;
   
-  const jsonMatch = content.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) {
-    throw new Error('Could not parse adjustment response');
+  let truncatedIngredients = item.ingredients || '';
+  let truncatedInstructions = item.instructions || '';
+  
+  // For meals with combined recipes, we need to be more aggressive with truncation
+  if (isMeal && truncatedIngredients.length > MAX_INGREDIENT_LENGTH) {
+    // Try to keep the first part of each recipe's ingredients
+    const lines = truncatedIngredients.split('\n');
+    let result = [];
+    let currentLength = 0;
+    
+    for (const line of lines) {
+      if (currentLength + line.length > MAX_INGREDIENT_LENGTH) break;
+      result.push(line);
+      currentLength += line.length + 1;
+    }
+    
+    truncatedIngredients = result.join('\n') + '\n... (some ingredients truncated for processing)';
+  } else if (truncatedIngredients.length > MAX_INGREDIENT_LENGTH) {
+    truncatedIngredients = truncatedIngredients.substring(0, MAX_INGREDIENT_LENGTH) + '... (truncated)';
+  }
+  
+  if (truncatedInstructions.length > MAX_INSTRUCTION_LENGTH) {
+    truncatedInstructions = truncatedInstructions.substring(0, MAX_INSTRUCTION_LENGTH) + '... (truncated)';
   }
 
   try {
-    const adjustedRecipe = JSON.parse(jsonMatch[0]);
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${trimmedApiKey}`
+      },
+      body: JSON.stringify({
+        model: 'gpt-3.5-turbo',
+        messages: [{
+          role: 'user',
+          content: `Scale this ${isMeal ? 'meal' : 'recipe'} from ${currentServings} to ${targetServings} servings (${scaleFactor}x).
+
+Title: ${item.title}
+Ingredients: ${truncatedIngredients}
+Instructions: ${truncatedInstructions}
+
+IMPORTANT: Multiply ALL quantities by ${scaleFactor}.
+
+Return ONLY scaled ingredients and instructions in this JSON format:
+{
+  "ingredients": "scaled ingredients here",
+  "instructions": "scaled instructions here"
+}`
+        }],
+        max_tokens: 1500,
+        temperature: 0.1
+      })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => null);
+      console.error('OpenAI API Error Details:', {
+        status: response.status,
+        statusText: response.statusText,
+        error: errorData
+      });
+      
+      // Handle specific error cases
+      if (response.status === 401) {
+        throw new Error('Invalid API key. Please check your OpenAI API key.');
+      } else if (response.status === 429) {
+        throw new Error('Rate limit exceeded. Please try again later.');
+      } else if (response.status === 400) {
+        const message = errorData?.error?.message || 'Bad request';
+        if (message.includes('quota')) {
+          throw new Error('OpenAI API quota exceeded. Please check your account.');
+        } else if (message.includes('context length')) {
+          // If still too long, fall back to simple scaling
+          console.warn('Recipe too long for AI scaling, using simple multiplication');
+          return createSimpleScaledRecipe(item, targetServings, scaleFactor);
+        }
+        throw new Error('Request error: ' + message);
+      }
+      
+      const errorMessage = errorData?.error?.message || `OpenAI API error: ${response.status}`;
+      throw new Error(errorMessage);
+    }
+
+    const result = await response.json();
+    const content = result.choices[0].message.content;
     
-    // Add metadata for preview vs saved
-    adjustedRecipe.isScaledPreview = !saveScaled;
-    adjustedRecipe.originalId = saveScaled ? null : item.id;
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      throw new Error('Could not parse adjustment response');
+    }
+
+    const scaledContent = JSON.parse(jsonMatch[0]);
+    
+    // Build the complete scaled recipe
+    const adjustedRecipe = {
+      ...item,
+      id: saveScaled ? Date.now() : item.id,
+      title: saveScaled ? `${item.title} (${targetServings} servings)` : item.title,
+      ingredients: scaledContent.ingredients || item.ingredients,
+      instructions: scaledContent.instructions || item.instructions,
+      nutrition: {
+        calories: Math.round((parseInt(item.nutrition?.calories) || 0) * scaleFactor).toString(),
+        protein: Math.round((parseInt(item.nutrition?.protein) || 0) * scaleFactor).toString(),
+        carbs: Math.round((parseInt(item.nutrition?.carbs) || 0) * scaleFactor).toString(),
+        fat: Math.round((parseInt(item.nutrition?.fat) || 0) * scaleFactor).toString(),
+        fiber: Math.round((parseInt(item.nutrition?.fiber) || 0) * scaleFactor).toString(),
+        servings: targetServings.toString()
+      },
+      isScaledPreview: !saveScaled,
+      originalId: saveScaled ? null : item.id
+    };
     
     return adjustedRecipe;
   } catch (error) {
-    throw new Error('Failed to parse adjusted recipe: ' + error.message);
+    // If AI fails, fall back to simple scaling
+    if (error.message.includes('context length') || error.message.includes('too long')) {
+      return createSimpleScaledRecipe(item, targetServings, scaleFactor);
+    }
+    throw error;
   }
+}
+
+// Fallback function for simple scaling when recipe is too long
+function createSimpleScaledRecipe(item, targetServings, scaleFactor) {
+  return {
+    ...item,
+    id: Date.now(),
+    title: `${item.title} (${targetServings} servings)`,
+    ingredients: `${item.ingredients}\n\n⚠️ Note: Please manually adjust quantities by ${scaleFactor}x`,
+    instructions: item.instructions,
+    nutrition: {
+      calories: Math.round((parseInt(item.nutrition?.calories) || 0) * scaleFactor).toString(),
+      protein: Math.round((parseInt(item.nutrition?.protein) || 0) * scaleFactor).toString(),
+      carbs: Math.round((parseInt(item.nutrition?.carbs) || 0) * scaleFactor).toString(),
+      fat: Math.round((parseInt(item.nutrition?.fat) || 0) * scaleFactor).toString(),
+      fiber: Math.round((parseInt(item.nutrition?.fiber) || 0) * scaleFactor).toString(),
+      servings: targetServings.toString()
+    },
+    isScaledPreview: false,
+    originalId: null
+  };
 }

@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { scaleWithAI } from '../utils/aiHelpers';
 import { formatNutritionValue } from '../utils/formatters';
 
-function ModernRecipeCard({ item, isMeal, onUpdate, onDelete, openaiApiKey }) {
+function ModernRecipeCard({ item, isMeal, onUpdate, onDelete, openaiApiKey, onSaveScaled }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [editingTags, setEditingTags] = useState(false);
   const [scalingMode, setScalingMode] = useState(false);
@@ -48,7 +48,12 @@ function ModernRecipeCard({ item, isMeal, onUpdate, onDelete, openaiApiKey }) {
       };
       
       // Add to recipes list
-      onUpdate('ADD_NEW', newScaledItem);
+      if (onSaveScaled) {
+        onSaveScaled(newScaledItem);
+      } else {
+        // Fallback if onSaveScaled is not provided
+        alert('Unable to save scaled recipe. Please try again.');
+      }
       
       setScalingMode(false);
       setTargetServings('');

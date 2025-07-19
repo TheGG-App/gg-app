@@ -1,4 +1,4 @@
-// src/features/recipes/hooks/useRecipeLogic.js - Updated to return parsed recipe
+// src/features/recipes/hooks/useRecipeLogic.js - Fixed tag filtering
 import { useState, useMemo } from 'react';
 import { parseRecipeFromUrl, parseRecipeFromText, scaleWithAI } from '../../../shared/utils/aiHelpers';
 import { parseTimeToMinutes } from '../utils/recipeUtils';
@@ -23,14 +23,22 @@ export function useRecipeLogic(recipes, setRecipes, selectedMealType, openaiApiK
 
   // Filtered recipes based on meal type and filters
   const filteredRecipes = useMemo(() => {
+    console.log('useRecipeLogic: Filtering recipes with state:', filterState);
+    
     const mealTypeRecipes = selectedMealType === 'all' 
       ? recipes 
       : recipes.filter(recipe => recipe.mealType === selectedMealType);
 
-    return mealTypeRecipes.filter(recipe => {
+    const filtered = mealTypeRecipes.filter(recipe => {
       // Tags filter
       const tagMatches = Object.keys(filterState.tags).filter(key => filterState.tags[key]);
-      const tagMatch = tagMatches.length === 0 || tagMatches.some(tag => recipe.tags?.[tag]);
+      console.log('Active tag filters:', tagMatches);
+      
+      const tagMatch = tagMatches.length === 0 || tagMatches.some(tag => {
+        const hasTag = recipe.tags?.[tag];
+        console.log(`Recipe "${recipe.title}" has tag "${tag}":`, hasTag);
+        return hasTag;
+      });
       
       // Cook time filter
       let cookTimeMatch = true;
@@ -56,17 +64,42 @@ export function useRecipeLogic(recipes, setRecipes, selectedMealType, openaiApiK
         recipe.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
         recipe.ingredients.toLowerCase().includes(searchTerm.toLowerCase());
       
-      return tagMatch && cookTimeMatch && searchMatch;
+      const finalMatch = tagMatch && cookTimeMatch && searchMatch;
+      console.log(`Recipe "${recipe.title}" matches:`, { tagMatch, cookTimeMatch, searchMatch, finalMatch });
+      
+      return finalMatch;
     });
+    
+    console.log('Final filtered recipes:', filtered.length, 'out of', mealTypeRecipes.length);
+    return filtered;
   }, [recipes, selectedMealType, filterState, searchTerm]);
 
-  // Update filter function
+  // Update filter function - FIXED to handle tags properly
   const updateFilter = (key, value) => {
+    console.log('useRecipeLogic: updateFilter called with:', key, value);
     if (key === 'tags') {
-      setFilterState(prev => ({
-        ...prev,
-        tags: value
-      }));
+      // If value is a function (from setFilterTags), apply it to current tags
+      if (typeof value === 'function') {
+        setFilterState(prev => {
+          const newTags = value(prev.tags);
+          const newState = {
+            ...prev,
+            tags: newTags
+          };
+          console.log('useRecipeLogic: New filter state:', newState);
+          return newState;
+        });
+      } else {
+        // If value is an object, replace tags entirely
+        setFilterState(prev => {
+          const newState = {
+            ...prev,
+            tags: value
+          };
+          console.log('useRecipeLogic: New filter state:', newState);
+          return newState;
+        });
+      }
     } else {
       setFilterState(prev => ({
         ...prev,
