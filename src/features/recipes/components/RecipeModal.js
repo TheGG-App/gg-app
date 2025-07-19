@@ -1,7 +1,8 @@
-// src/features/recipes/components/RecipeModal.js - Fixed image size and button alignment
+// src/features/recipes/components/RecipeModal.js - Updated with optimized images
 import React, { useState, useEffect } from 'react';
 import { scaleWithAI } from '../../../shared/utils/aiHelpers';
 import IngredientItem from './IngredientItem';
+import OptimizedImage from '../../../shared/components/OptimizedImage';
 import { formatNutritionValue } from '../../../shared/utils/formatters';
 
 function RecipeModal({ recipe, isOpen, onClose, onUpdate, onDelete, openaiApiKey, onSaveScaled }) {
@@ -9,7 +10,7 @@ function RecipeModal({ recipe, isOpen, onClose, onUpdate, onDelete, openaiApiKey
   const [targetServings, setTargetServings] = useState('');
   const [isScaling, setIsScaling] = useState(false);
   const [showScaleInput, setShowScaleInput] = useState(false);
-  const [imageError, setImageError] = useState(false);
+  const [selectedFile, setSelectedFile] = useState(null);
 
   // Reset state when modal opens/closes
   useEffect(() => {
@@ -17,7 +18,6 @@ function RecipeModal({ recipe, isOpen, onClose, onUpdate, onDelete, openaiApiKey
       setScaledRecipe(null);
       setTargetServings('');
       setShowScaleInput(false);
-      setImageError(false);
     }
   }, [isOpen, recipe?.id]);
 
@@ -82,507 +82,283 @@ function RecipeModal({ recipe, isOpen, onClose, onUpdate, onDelete, openaiApiKey
         return;
       }
 
+      setSelectedFile(file);
+      
+      // Create a data URL for the image
       const reader = new FileReader();
       reader.onload = (e) => {
-        const img = new Image();
-        img.onload = () => {
-          // Resize image if too large
-          const canvas = document.createElement('canvas');
-          const ctx = canvas.getContext('2d');
-          
-          // Set max dimensions
-          const maxWidth = 800;
-          const maxHeight = 600;
-          
-          let { width, height } = img;
-          
-          // Calculate new dimensions
-          if (width > height) {
-            if (width > maxWidth) {
-              height = (height * maxWidth) / width;
-              width = maxWidth;
-            }
-          } else {
-            if (height > maxHeight) {
-              width = (width * maxHeight) / height;
-              height = maxHeight;
-            }
-          }
-          
-          canvas.width = width;
-          canvas.height = height;
-          
-          // Draw and compress
-          ctx.drawImage(img, 0, 0, width, height);
-          const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.8);
-          
-          onUpdate(recipe.id, { image: compressedDataUrl });
-          setImageError(false);
-        };
-        img.src = e.target.result;
+        onUpdate(recipe.id, { image: e.target.result });
       };
       reader.readAsDataURL(file);
     }
   };
 
-  const ingredientsList = displayRecipe.ingredients ? 
-    (typeof displayRecipe.ingredients === 'string' ? displayRecipe.ingredients.split('\n').filter(ing => ing.trim()) : []) : [];
-  const instructionsList = displayRecipe.instructions ? 
-    (typeof displayRecipe.instructions === 'string' ? displayRecipe.instructions.split('\n').filter(inst => inst.trim()) : []) : [];
-
-  // Calculate nutrition box height to align image
-  const hasNutrition = displayRecipe.nutrition?.calories || displayRecipe.nutrition?.protein;
-  const nutritionBoxHeight = hasNutrition ? 140 : 0; // Approximate height of nutrition box
-
   return (
-    <div 
-      style={{
-        position: 'fixed',
-        top: 0, left: 0, right: 0, bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        backdropFilter: 'blur(4px)',
-        zIndex: 1000,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '20px'
-      }}
-      onClick={onClose}
-    >
+    <>
+      {/* Backdrop */}
       <div 
         style={{
-          backgroundColor: 'white',
-          borderRadius: '20px',
-          maxWidth: '900px',
-          width: '100%',
-          maxHeight: '90vh',
-          overflow: 'hidden',
-          boxShadow: '0 20px 60px rgba(0, 0, 0, 0.15)',
+          position: 'fixed',
+          top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          backdropFilter: 'blur(4px)',
+          zIndex: 1000,
           display: 'flex',
-          flexDirection: 'column'
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '20px',
+          animation: 'fadeIn 0.2s ease'
+        }}
+        onClick={onClose}
+      />
+
+      {/* Modal */}
+      <div
+        style={{
+          position: 'fixed',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          backgroundColor: 'white',
+          borderRadius: '24px',
+          width: '90%',
+          maxWidth: '900px',
+          height: '90vh',
+          maxHeight: '800px',
+          boxShadow: '0 25px 50px rgba(0, 0, 0, 0.2)',
+          zIndex: 1001,
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+          animation: 'slideIn 0.3s ease'
         }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div style={{
-          padding: '25px 30px',
-          borderBottom: '1px solid #f0f0f0',
-          background: 'white'
+          padding: '30px',
+          borderBottom: '1px solid #e5e7eb',
+          background: 'linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%)',
+          position: 'relative'
         }}>
-          <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-start' }}>
-            {/* Recipe Image - Larger size */}
-            <div 
-              style={{
-                width: '200px',
-                height: nutritionBoxHeight ? `${80 + nutritionBoxHeight}px` : '200px',
-                borderRadius: '15px',
-                overflow: 'hidden',
-                background: '#f3f4f6',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexShrink: 0,
-                cursor: 'pointer',
-                border: '2px solid #e5e7eb',
-                position: 'relative',
-                transition: 'all 0.2s'
-              }}
-              onClick={() => document.getElementById('recipe-image-upload')?.click()}
-              onMouseOver={(e) => {
-                e.currentTarget.style.borderColor = '#06b6d4';
-                e.currentTarget.style.transform = 'scale(1.02)';
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.borderColor = '#e5e7eb';
-                e.currentTarget.style.transform = 'scale(1)';
-              }}
-            >
-              {displayRecipe.image && !imageError ? (
-                <>
-                  <img
-                    src={displayRecipe.image}
-                    alt={displayRecipe.title}
-                    style={{
-                      width: '100%',
-                      height: '100%',
-                      objectFit: 'cover'
-                    }}
-                    onError={() => setImageError(true)}
-                  />
-                  <div style={{
-                    position: 'absolute',
-                    top: 0, left: 0, right: 0, bottom: 0,
-                    background: 'rgba(0, 0, 0, 0.5)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    opacity: 0,
-                    transition: 'opacity 0.2s'
-                  }}
-                  onMouseOver={(e) => e.currentTarget.style.opacity = 1}
-                  onMouseOut={(e) => e.currentTarget.style.opacity = 0}
-                  >
-                    <span style={{ color: 'white', fontSize: '0.9rem', fontWeight: '600' }}>
-                      Change Photo
-                    </span>
-                  </div>
-                </>
-              ) : (
-                <div style={{
-                  textAlign: 'center',
-                  color: '#9ca3af'
-                }}>
-                  <div style={{ fontSize: '3rem', marginBottom: '10px' }}>📸</div>
-                  <div style={{ fontSize: '0.9rem', fontWeight: '600' }}>
-                    Add Photo
-                  </div>
-                </div>
-              )}
-              <input
-                id="recipe-image-upload"
-                type="file"
-                accept="image/*"
-                style={{ display: 'none' }}
-                onChange={handleImageUpload}
-              />
-            </div>
-
-            {/* Recipe Info */}
-            <div style={{ flex: 1 }}>
-              <h2 style={{
-                margin: '0 0 5px 0',
-                fontSize: '2rem',
-                fontWeight: '700',
-                color: '#1f2937',
-                fontFamily: 'Georgia, serif'
-              }}>
-                {displayRecipe.title}
-                {isShowingScaled && (
-                  <span style={{
-                    fontSize: '1rem',
-                    fontWeight: '500',
-                    color: '#f59e0b',
-                    marginLeft: '10px'
-                  }}>
-                    (Adjusted Preview)
-                  </span>
-                )}
-              </h2>
-              
-              {/* Source URL */}
-              {displayRecipe.sourceUrl && (
-                <div style={{ marginBottom: '10px' }}>
-                  <a 
-                    href={displayRecipe.sourceUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{
-                      color: '#0891b2',
-                      textDecoration: 'none',
-                      fontSize: '0.85rem',
-                      fontWeight: '500'
-                    }}
-                    onMouseOver={(e) => e.target.style.textDecoration = 'underline'}
-                    onMouseOut={(e) => e.target.style.textDecoration = 'none'}
-                  >
-                    📖 View Original Recipe
-                  </a>
-                </div>
-              )}
-              
-              <div style={{
-                display: 'flex',
-                gap: '20px',
-                flexWrap: 'wrap',
-                fontSize: '0.9rem',
-                color: '#6b7280',
-                marginBottom: '15px'
-              }}>
-                <span><strong>⏱️ Cook Time:</strong> {displayRecipe.cookTime}</span>
-                <span><strong>🍽️ Servings:</strong> {displayRecipe.nutrition?.servings || 'Unknown'}</span>
-              </div>
-
-              {/* Nutrition Information */}
-              {hasNutrition && (
-                <div style={{
-                  background: 'white',
-                  padding: '15px',
-                  borderRadius: '12px',
-                  border: '2px solid #06b6d4',
-                  boxShadow: '0 2px 8px rgba(6, 182, 212, 0.1)'
-                }}>
-                  <h4 style={{
-                    margin: '0 0 10px 0',
-                    color: '#1f2937',
-                    fontSize: '1rem',
-                    fontWeight: '600'
-                  }}>
-                    🥗 Nutrition Information
-                    {displayRecipe.nutrition?.servings && ` (per serving)`}
-                  </h4>
-                  <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(80px, 1fr))',
-                    gap: '10px'
-                  }}>
-                    {displayRecipe.nutrition?.calories && (
-                      <div style={{ textAlign: 'center' }}>
-                        <div style={{ fontSize: '1.2rem', fontWeight: '700', color: '#06b6d4' }}>
-                          {formatNutritionValue(displayRecipe.nutrition.calories, '')}
-                        </div>
-                        <div style={{ fontSize: '0.7rem', color: '#1f2937', fontWeight: '600' }}>
-                          Calories
-                        </div>
-                      </div>
-                    )}
-                    {displayRecipe.nutrition?.protein && (
-                      <div style={{ textAlign: 'center' }}>
-                        <div style={{ fontSize: '1.2rem', fontWeight: '700', color: '#06b6d4' }}>
-                          {formatNutritionValue(displayRecipe.nutrition.protein, 'g')}
-                        </div>
-                        <div style={{ fontSize: '0.7rem', color: '#1f2937', fontWeight: '600' }}>
-                          Protein
-                        </div>
-                      </div>
-                    )}
-                    {displayRecipe.nutrition?.carbs && (
-                      <div style={{ textAlign: 'center' }}>
-                        <div style={{ fontSize: '1.2rem', fontWeight: '700', color: '#06b6d4' }}>
-                          {formatNutritionValue(displayRecipe.nutrition.carbs, 'g')}
-                        </div>
-                        <div style={{ fontSize: '0.7rem', color: '#1f2937', fontWeight: '600' }}>
-                          Carbs
-                        </div>
-                      </div>
-                    )}
-                    {displayRecipe.nutrition?.fat && (
-                      <div style={{ textAlign: 'center' }}>
-                        <div style={{ fontSize: '1.2rem', fontWeight: '700', color: '#06b6d4' }}>
-                          {formatNutritionValue(displayRecipe.nutrition.fat, 'g')}
-                        </div>
-                        <div style={{ fontSize: '0.7rem', color: '#1f2937', fontWeight: '600' }}>
-                          Fat
-                        </div>
-                      </div>
-                    )}
-                    {displayRecipe.nutrition?.fiber && (
-                      <div style={{ textAlign: 'center' }}>
-                        <div style={{ fontSize: '1.2rem', fontWeight: '700', color: '#06b6d4' }}>
-                          {formatNutritionValue(displayRecipe.nutrition.fiber, 'g')}
-                        </div>
-                        <div style={{ fontSize: '0.7rem', color: '#1f2937', fontWeight: '600' }}>
-                          Fiber
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-            
-            {/* Top Right Controls - Fixed alignment */}
-            <div style={{ 
-              display: 'flex', 
-              gap: '10px', 
+          {/* Close Button */}
+          <button
+            onClick={onClose}
+            style={{
+              position: 'absolute',
+              top: '20px',
+              right: '20px',
+              background: 'white',
+              border: '1px solid #e5e7eb',
+              borderRadius: '50%',
+              width: '40px',
+              height: '40px',
+              cursor: 'pointer',
+              display: 'flex',
               alignItems: 'center',
-              height: '40px' // Fixed height to ensure alignment
-            }}>
-              {/* Adjust Button */}
-              {!showScaleInput && !isShowingScaled && (
-                <button
-                  onClick={() => setShowScaleInput(true)}
-                  disabled={!openaiApiKey}
-                  style={{
-                    background: openaiApiKey ? '#06b6d4' : '#9ca3af',
-                    color: 'white',
-                    border: 'none',
-                    padding: '0 16px',
-                    height: '40px', // Same height as close button
-                    borderRadius: '8px',
-                    cursor: openaiApiKey ? 'pointer' : 'not-allowed',
-                    fontSize: '0.9rem',
-                    fontWeight: '600',
-                    transition: 'all 0.2s',
-                    display: 'flex',
-                    alignItems: 'center'
-                  }}
-                  onMouseOver={(e) => {
-                    if (openaiApiKey) {
-                      e.target.style.background = '#0891b2';
-                      e.target.style.transform = 'translateY(-1px)';
-                    }
-                  }}
-                  onMouseOut={(e) => {
-                    if (openaiApiKey) {
-                      e.target.style.background = '#06b6d4';
-                      e.target.style.transform = 'translateY(0)';
-                    }
-                  }}
-                >
-                  Adjust
-                </button>
-              )}
+              justifyContent: 'center',
+              fontSize: '1.2rem',
+              color: '#6b7280',
+              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)',
+              transition: 'all 0.2s ease',
+              WebkitTapHighlightColor: 'transparent'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = '#f3f4f6';
+              e.currentTarget.style.transform = 'scale(1.1)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = 'white';
+              e.currentTarget.style.transform = 'scale(1)';
+            }}
+          >
+            ×
+          </button>
 
-              {/* Close Button */}
+          {/* Recipe Title */}
+          <h2 style={{
+            margin: '0 40px 0 0',
+            fontSize: 'clamp(1.5rem, 3vw, 2rem)',
+            fontWeight: '800',
+            color: '#1f2937',
+            fontFamily: 'Georgia, serif',
+            lineHeight: '1.2'
+          }}>
+            {displayRecipe.title}
+          </h2>
+
+          {/* Time and Servings */}
+          <div style={{
+            display: 'flex',
+            gap: '30px',
+            marginTop: '15px',
+            fontSize: '1rem',
+            color: '#6b7280'
+          }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span>⏱️</span>
+              <span style={{ fontWeight: '600' }}>{displayRecipe.cookTime || 'Time not specified'}</span>
+            </span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span>🍽️</span>
+              <span style={{ fontWeight: '600' }}>
+                {displayRecipe.nutrition?.servings || '?'} servings
+              </span>
+            </span>
+            {displayRecipe.nutrition?.calories && (
+              <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span>🔥</span>
+                <span style={{ fontWeight: '600' }}>
+                  {formatNutritionValue(displayRecipe.nutrition.calories, '')} cal/serving
+                </span>
+              </span>
+            )}
+          </div>
+
+          {/* Scaling Controls */}
+          <div style={{ marginTop: '20px' }}>
+            {!showScaleInput ? (
               <button
-                onClick={onClose}
+                onClick={() => setShowScaleInput(true)}
                 style={{
-                  background: '#ef4444',
+                  background: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)',
                   color: 'white',
                   border: 'none',
-                  borderRadius: '50%',
-                  width: '40px',
-                  height: '40px',
+                  padding: '10px 20px',
+                  borderRadius: '10px',
                   cursor: 'pointer',
-                  fontSize: '1.2rem',
-                  fontWeight: 'bold',
-                  transition: 'all 0.2s',
+                  fontSize: '0.9rem',
+                  fontWeight: '600',
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center'
+                  gap: '8px',
+                  boxShadow: '0 4px 12px rgba(6, 182, 212, 0.2)',
+                  transition: 'all 0.2s ease',
+                  WebkitTapHighlightColor: 'transparent'
                 }}
                 onMouseOver={(e) => {
-                  e.target.style.background = '#dc2626';
-                  e.target.style.transform = 'scale(1.1)';
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = '0 6px 16px rgba(6, 182, 212, 0.3)';
                 }}
                 onMouseOut={(e) => {
-                  e.target.style.background = '#ef4444';
-                  e.target.style.transform = 'scale(1)';
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(6, 182, 212, 0.2)';
                 }}
               >
-                ✕
+                ⚖️ Adjust Servings
               </button>
-            </div>
+            ) : (
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                <input
+                  type="number"
+                  min="1"
+                  max="100"
+                  value={targetServings}
+                  onChange={(e) => setTargetServings(e.target.value)}
+                  placeholder="Servings"
+                  style={{
+                    padding: '8px 12px',
+                    borderRadius: '8px',
+                    border: '2px solid #e5e7eb',
+                    fontSize: '1rem',
+                    width: '100px',
+                    outline: 'none'
+                  }}
+                  onFocus={(e) => e.target.style.borderColor = '#06b6d4'}
+                  onBlur={(e) => e.target.style.borderColor = '#e5e7eb'}
+                />
+                <button
+                  onClick={handleScale}
+                  disabled={isScaling || !targetServings}
+                  style={{
+                    background: isScaling || !targetServings ? '#9ca3af' : '#06b6d4',
+                    color: 'white',
+                    border: 'none',
+                    padding: '8px 16px',
+                    borderRadius: '8px',
+                    cursor: isScaling || !targetServings ? 'not-allowed' : 'pointer',
+                    fontSize: '0.9rem',
+                    fontWeight: '600',
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  {isScaling ? '🔄 Scaling...' : '✨ Scale'}
+                </button>
+                <button
+                  onClick={() => {
+                    setShowScaleInput(false);
+                    setTargetServings('');
+                  }}
+                  style={{
+                    background: '#f3f4f6',
+                    color: '#6b7280',
+                    border: 'none',
+                    padding: '8px 16px',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontSize: '0.9rem',
+                    fontWeight: '600'
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
           </div>
-        </div>
 
-        {/* Action Bar */}
-        <div style={{
-          padding: '20px 30px',
-          borderBottom: '1px solid #f0f0f0',
-          background: '#fafafa',
-          display: 'flex',
-          gap: '10px',
-          alignItems: 'center',
-          flexWrap: 'wrap'
-        }}>
-          {showScaleInput && !isShowingScaled && (
-            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-              <span style={{ fontSize: '0.9rem', fontWeight: '600', color: '#374151' }}>
-                Adjust to:
-              </span>
-              <input
-                type="number"
-                min="1"
-                max="50"
-                placeholder="servings"
-                value={targetServings}
-                onChange={(e) => setTargetServings(e.target.value)}
-                style={{
-                  width: '80px',
-                  padding: '8px',
-                  borderRadius: '6px',
-                  border: '2px solid #e5e7eb',
-                  outline: 'none',
-                  transition: 'border-color 0.2s'
-                }}
-                onFocus={(e) => e.target.style.borderColor = '#06b6d4'}
-                onBlur={(e) => e.target.style.borderColor = '#e5e7eb'}
-                disabled={isScaling}
-              />
-              <button
-                onClick={handleScale}
-                disabled={isScaling || !targetServings}
-                style={{
-                  background: isScaling || !targetServings ? '#9ca3af' : '#06b6d4',
-                  color: 'white',
-                  border: 'none',
-                  padding: '8px 16px',
-                  borderRadius: '6px',
-                  cursor: isScaling || !targetServings ? 'not-allowed' : 'pointer',
-                  fontSize: '0.9rem',
-                  fontWeight: '600'
-                }}
-              >
-                {isScaling ? '🔄 Adjusting...' : '✨ Preview'}
-              </button>
-              <button
-                onClick={() => setShowScaleInput(false)}
-                style={{
-                  background: '#f3f4f6',
-                  color: '#6b7280',
-                  border: 'none',
-                  padding: '8px 16px',
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  fontSize: '0.9rem',
-                  fontWeight: '600',
-                  transition: 'all 0.2s'
-                }}
-                onMouseOver={(e) => {
-                  e.target.style.background = '#e5e7eb';
-                  e.target.style.color = '#4b5563';
-                }}
-                onMouseOut={(e) => {
-                  e.target.style.background = '#f3f4f6';
-                  e.target.style.color = '#6b7280';
-                }}
-              >
-                Cancel
-              </button>
-            </div>
-          )}
-
+          {/* Scaled Recipe Actions */}
           {isShowingScaled && (
-            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-              <button
-                onClick={handleSaveScaled}
-                style={{
-                  background: '#22c55e',
-                  color: 'white',
-                  border: 'none',
-                  padding: '10px 20px',
-                  borderRadius: '10px',
-                  cursor: 'pointer',
-                  fontSize: '0.9rem',
-                  fontWeight: '600',
-                  transition: 'all 0.2s'
-                }}
-                onMouseOver={(e) => {
-                  e.target.style.background = '#16a34a';
-                  e.target.style.transform = 'translateY(-1px)';
-                }}
-                onMouseOut={(e) => {
-                  e.target.style.background = '#22c55e';
-                  e.target.style.transform = 'translateY(0)';
-                }}
-              >
-                💾 Save Adjusted Recipe
-              </button>
-              <button
-                onClick={handleResetScale}
-                style={{
-                  background: '#f59e0b',
-                  color: 'white',
-                  border: 'none',
-                  padding: '10px 20px',
-                  borderRadius: '10px',
-                  cursor: 'pointer',
-                  fontSize: '0.9rem',
-                  fontWeight: '600',
-                  transition: 'all 0.2s'
-                }}
-                onMouseOver={(e) => {
-                  e.target.style.background = '#d97706';
-                  e.target.style.transform = 'translateY(-1px)';
-                }}
-                onMouseOut={(e) => {
-                  e.target.style.background = '#f59e0b';
-                  e.target.style.transform = 'translateY(0)';
-                }}
-              >
-                🔄 Reset to Original
-              </button>
+            <div style={{
+              marginTop: '15px',
+              padding: '15px',
+              background: '#ecfdf5',
+              border: '1px solid #10b981',
+              borderRadius: '10px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '10px'
+            }}>
+              <span style={{
+                color: '#065f46',
+                fontWeight: '600',
+                fontSize: '0.9rem'
+              }}>
+                ✅ Recipe scaled to {scaledRecipe.nutrition.servings} servings
+              </span>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button
+                  onClick={handleSaveScaled}
+                  style={{
+                    background: '#10b981',
+                    color: 'white',
+                    border: 'none',
+                    padding: '8px 16px',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontSize: '0.85rem',
+                    fontWeight: '600',
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  💾 Save as New
+                </button>
+                <button
+                  onClick={handleResetScale}
+                  style={{
+                    background: '#f59e0b',
+                    color: 'white',
+                    border: 'none',
+                    padding: '8px 16px',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontSize: '0.85rem',
+                    fontWeight: '600'
+                  }}
+                >
+                  🔄 Reset
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -592,144 +368,327 @@ function RecipeModal({ recipe, isOpen, onClose, onUpdate, onDelete, openaiApiKey
           flex: 1,
           overflow: 'auto',
           padding: '30px',
-          background: 'white'
+          background: 'white',
+          WebkitOverflowScrolling: 'touch'
         }}>
           {/* Content Grid */}
           <div style={{
             display: 'grid',
-            gridTemplateColumns: '1fr 1fr',
+            gridTemplateColumns: window.innerWidth > 768 ? '350px 1fr' : '1fr',
             gap: '30px'
           }}>
-            {/* Ingredients */}
+            {/* Left Column - Image and Actions */}
             <div>
-              <h3 style={{
-                margin: '0 0 20px 0',
-                color: '#1f2937',
-                fontSize: '1.4rem',
-                fontWeight: '700',
-                fontFamily: 'Georgia, serif',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px'
+              {/* Recipe Image */}
+              <div style={{
+                marginBottom: '20px',
+                borderRadius: '16px',
+                overflow: 'hidden',
+                boxShadow: '0 8px 24px rgba(0, 0, 0, 0.08)',
+                position: 'relative',
+                background: '#f3f4f6'
               }}>
-                🛒 Ingredients
-                {isShowingScaled && (
-                  <span style={{
-                    fontSize: '0.8rem',
-                    background: '#f59e0b',
+                <OptimizedImage
+                  src={displayRecipe.image}
+                  alt={displayRecipe.title}
+                  aspectRatio="4:3"
+                  placeholder="🍽️"
+                  priority={true}
+                />
+                
+                {/* Image Upload Overlay */}
+                <label 
+                  htmlFor="recipe-image-upload"
+                  style={{
+                    position: 'absolute',
+                    bottom: '10px',
+                    right: '10px',
+                    background: 'rgba(0, 0, 0, 0.7)',
                     color: 'white',
-                    padding: '4px 8px',
-                    borderRadius: '8px'
-                  }}>
-                    ADJUSTED
-                  </span>
-                )}
-              </h3>
-              <ul style={{
-                listStyle: 'none',
-                padding: 0,
-                margin: 0
-              }}>
-                {ingredientsList.map((ingredient, index) => (
-                  <IngredientItem 
-                    key={index}
-                    ingredient={ingredient}
-                    openaiApiKey={openaiApiKey}
-                  />
-                ))}
-              </ul>
-            </div>
+                    padding: '8px 16px',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontSize: '0.85rem',
+                    fontWeight: '600',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    transition: 'background 0.2s ease',
+                    WebkitTapHighlightColor: 'transparent'
+                  }}
+                  onMouseOver={(e) => e.currentTarget.style.background = 'rgba(0, 0, 0, 0.8)'}
+                  onMouseOut={(e) => e.currentTarget.style.background = 'rgba(0, 0, 0, 0.7)'}
+                >
+                  📸 {displayRecipe.image ? 'Change' : 'Add'} Photo
+                </label>
+                <input
+                  id="recipe-image-upload"
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                  style={{ display: 'none' }}
+                />
+              </div>
 
-            {/* Instructions */}
-            <div>
-              <h3 style={{
-                margin: '0 0 20px 0',
-                color: '#1f2937',
-                fontSize: '1.4rem',
-                fontWeight: '700',
-                fontFamily: 'Georgia, serif',
+              {/* Action Buttons */}
+              <div style={{
                 display: 'flex',
-                alignItems: 'center',
-                gap: '10px'
+                gap: '10px',
+                marginBottom: '20px'
               }}>
-                👨‍🍳 Instructions
-                {isShowingScaled && (
-                  <span style={{
-                    fontSize: '0.8rem',
-                    background: '#f59e0b',
-                    color: 'white',
-                    padding: '4px 8px',
-                    borderRadius: '8px'
-                  }}>
-                    ADJUSTED
-                  </span>
-                )}
-              </h3>
-              <ol style={{
-                padding: '0 0 0 20px',
-                margin: 0
-              }}>
-                {instructionsList.map((instruction, index) => (
-                  <li key={index} style={{
-                    marginBottom: '15px',
+                <button
+                  onClick={() => {
+                    // Implement edit functionality
+                    alert('Edit feature coming soon! 🚧');
+                  }}
+                  style={{
+                    flex: 1,
+                    background: '#f3f4f6',
                     color: '#374151',
-                    lineHeight: '1.6',
-                    fontSize: '0.95rem'
-                  }}>
-                    {instruction.trim()}
-                  </li>
-                ))}
-              </ol>
-            </div>
-          </div>
+                    border: '1px solid #e5e7eb',
+                    padding: '12px',
+                    borderRadius: '10px',
+                    cursor: 'pointer',
+                    fontSize: '0.9rem',
+                    fontWeight: '600',
+                    transition: 'all 0.2s ease',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.background = '#e5e7eb';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.background = '#f3f4f6';
+                  }}
+                >
+                  ✏️ Edit
+                </button>
+                <button
+                  onClick={() => onDelete(recipe.id)}
+                  style={{
+                    flex: 1,
+                    background: '#fee2e2',
+                    color: '#dc2626',
+                    border: '1px solid #fecaca',
+                    padding: '12px',
+                    borderRadius: '10px',
+                    cursor: 'pointer',
+                    fontSize: '0.9rem',
+                    fontWeight: '600',
+                    transition: 'all 0.2s ease',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.background = '#fecaca';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.background = '#fee2e2';
+                  }}
+                >
+                  🗑️ Delete
+                </button>
+              </div>
 
-          {/* Delete Recipe Button */}
-          <div style={{
-            marginTop: '40px',
-            paddingTop: '30px',
-            borderTop: '1px solid #f0f0f0',
-            display: 'flex',
-            justifyContent: 'center'
-          }}>
-            <button
-              onClick={() => {
-                if (window.confirm('Are you sure you want to delete this recipe?')) {
-                  onDelete(recipe.id);
-                }
-              }}
-              style={{
-                background: '#fef2f2',
-                color: '#dc2626',
-                border: '2px solid #fecaca',
-                borderRadius: '10px',
-                padding: '10px 20px',
-                cursor: 'pointer',
-                fontSize: '0.9rem',
-                fontWeight: '600',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                transition: 'all 0.2s ease'
-              }}
-              onMouseOver={(e) => {
-                e.target.style.background = '#ef4444';
-                e.target.style.borderColor = '#ef4444';
-                e.target.style.color = 'white';
-                e.target.style.transform = 'translateY(-1px)';
-              }}
-              onMouseOut={(e) => {
-                e.target.style.background = '#fef2f2';
-                e.target.style.borderColor = '#fecaca';
-                e.target.style.color = '#dc2626';
-                e.target.style.transform = 'translateY(0)';
-              }}
-            >
-              🗑️ Delete Recipe
-            </button>
+              {/* Nutrition Box */}
+              {displayRecipe.nutrition && (
+                <div style={{
+                  background: 'linear-gradient(135deg, #fef3c7 0%, #fed7aa 100%)',
+                  border: '2px solid #f59e0b',
+                  borderRadius: '16px',
+                  padding: '20px',
+                  boxShadow: '0 4px 12px rgba(245, 158, 11, 0.1)'
+                }}>
+                  <h4 style={{
+                    margin: '0 0 15px 0',
+                    color: '#92400e',
+                    fontSize: '1.1rem',
+                    fontWeight: '700',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}>
+                    🥗 Nutrition per Serving
+                  </h4>
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(2, 1fr)',
+                    gap: '12px'
+                  }}>
+                    {displayRecipe.nutrition.calories && (
+                      <div style={{
+                        background: 'rgba(255, 255, 255, 0.7)',
+                        padding: '12px',
+                        borderRadius: '10px',
+                        textAlign: 'center'
+                      }}>
+                        <div style={{ fontSize: '1.3rem', fontWeight: '700', color: '#92400e' }}>
+                          {formatNutritionValue(displayRecipe.nutrition.calories, '')}
+                        </div>
+                        <div style={{ fontSize: '0.75rem', color: '#78350f', fontWeight: '600' }}>
+                          Calories
+                        </div>
+                      </div>
+                    )}
+                    {displayRecipe.nutrition.protein && (
+                      <div style={{
+                        background: 'rgba(255, 255, 255, 0.7)',
+                        padding: '12px',
+                        borderRadius: '10px',
+                        textAlign: 'center'
+                      }}>
+                        <div style={{ fontSize: '1.3rem', fontWeight: '700', color: '#92400e' }}>
+                          {formatNutritionValue(displayRecipe.nutrition.protein, 'g')}
+                        </div>
+                        <div style={{ fontSize: '0.75rem', color: '#78350f', fontWeight: '600' }}>
+                          Protein
+                        </div>
+                      </div>
+                    )}
+                    {displayRecipe.nutrition.carbs && (
+                      <div style={{
+                        background: 'rgba(255, 255, 255, 0.7)',
+                        padding: '12px',
+                        borderRadius: '10px',
+                        textAlign: 'center'
+                      }}>
+                        <div style={{ fontSize: '1.3rem', fontWeight: '700', color: '#92400e' }}>
+                          {formatNutritionValue(displayRecipe.nutrition.carbs, 'g')}
+                        </div>
+                        <div style={{ fontSize: '0.75rem', color: '#78350f', fontWeight: '600' }}>
+                          Carbs
+                        </div>
+                      </div>
+                    )}
+                    {displayRecipe.nutrition.fat && (
+                      <div style={{
+                        background: 'rgba(255, 255, 255, 0.7)',
+                        padding: '12px',
+                        borderRadius: '10px',
+                        textAlign: 'center'
+                      }}>
+                        <div style={{ fontSize: '1.3rem', fontWeight: '700', color: '#92400e' }}>
+                          {formatNutritionValue(displayRecipe.nutrition.fat, 'g')}
+                        </div>
+                        <div style={{ fontSize: '0.75rem', color: '#78350f', fontWeight: '600' }}>
+                          Fat
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Right Column - Ingredients and Instructions */}
+            <div>
+              {/* Ingredients */}
+              <div style={{ marginBottom: '30px' }}>
+                <h3 style={{
+                  margin: '0 0 20px 0',
+                  fontSize: '1.4rem',
+                  fontWeight: '700',
+                  color: '#1f2937',
+                  fontFamily: 'Georgia, serif',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px'
+                }}>
+                  <span>🛒</span>
+                  Ingredients
+                </h3>
+                <div style={{
+                  background: '#f9fafb',
+                  borderRadius: '12px',
+                  padding: '20px',
+                  border: '1px solid #e5e7eb'
+                }}>
+                  <ul style={{
+                    listStyle: 'none',
+                    padding: 0,
+                    margin: 0,
+                    display: 'grid',
+                    gap: '12px'
+                  }}>
+                    {displayRecipe.ingredients.split('\n').filter(ing => ing.trim()).map((ingredient, index) => (
+                      <IngredientItem
+                        key={index}
+                        ingredient={ingredient}
+                        isScaled={isShowingScaled}
+                      />
+                    ))}
+                  </ul>
+                </div>
+              </div>
+
+              {/* Instructions */}
+              <div>
+                <h3 style={{
+                  margin: '0 0 20px 0',
+                  fontSize: '1.4rem',
+                  fontWeight: '700',
+                  color: '#1f2937',
+                  fontFamily: 'Georgia, serif',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px'
+                }}>
+                  <span>👨‍🍳</span>
+                  Instructions
+                </h3>
+                <div style={{
+                  background: '#f0fdf4',
+                  borderRadius: '12px',
+                  padding: '20px',
+                  border: '1px solid #bbf7d0'
+                }}>
+                  <ol style={{
+                    margin: 0,
+                    padding: '0 0 0 20px',
+                    display: 'grid',
+                    gap: '16px'
+                  }}>
+                    {displayRecipe.instructions.split('\n').filter(inst => inst.trim()).map((instruction, index) => (
+                      <li key={index} style={{
+                        color: '#1f2937',
+                        lineHeight: '1.6',
+                        paddingLeft: '8px'
+                      }}>
+                        {instruction.trim()}
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+
+      {/* CSS Animations */}
+      <style jsx>{`
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        
+        @keyframes slideIn {
+          from {
+            opacity: 0;
+            transform: translate(-50%, -48%) scale(0.96);
+          }
+          to {
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(1);
+          }
+        }
+      `}</style>
+    </>
   );
 }
 

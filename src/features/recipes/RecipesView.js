@@ -1,8 +1,8 @@
-// src/features/recipes/RecipesView.js - Grid-only view with updated header
-import React, { useState, useCallback } from 'react';
+// src/features/recipes/RecipesView.js - Updated with virtual scrolling
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import MealTypeLanding from './components/MealTypeLanding';
 import FilterBar from '../../shared/components/FilterBar';
-import CompactSquareRecipeCard from './components/CompactSquareRecipeCard';
+import VirtualizedRecipeGrid from './components/VirtualizedRecipeGrid';
 import RecipeModal from './components/RecipeModal';
 import RecipeImportConfirmation from './components/RecipeImportConfirmation';
 import { useRecipeLogic } from './hooks/useRecipeLogic';
@@ -16,6 +16,8 @@ function RecipesView({ recipes, setRecipes, openaiApiKey }) {
   const [importInput, setImportInput] = useState('');
   const [showImportConfirmation, setShowImportConfirmation] = useState(false);
   const [pendingRecipe, setPendingRecipe] = useState(null);
+  const [containerHeight, setContainerHeight] = useState(window.innerHeight - 300);
+  const headerRef = useRef(null);
 
   const {
     filteredRecipes,
@@ -33,7 +35,23 @@ function RecipesView({ recipes, setRecipes, openaiApiKey }) {
     updateFilter('tags', updater);
   }, [updateFilter]);
 
-  // Define all callback functions using useCallback to prevent hoisting issues
+  // Calculate container height based on header size
+  useEffect(() => {
+    const calculateHeight = () => {
+      if (headerRef.current) {
+        const headerHeight = headerRef.current.offsetHeight;
+        const windowHeight = window.innerHeight;
+        const padding = 40; // Bottom padding
+        setContainerHeight(windowHeight - headerHeight - padding);
+      }
+    };
+
+    calculateHeight();
+    window.addEventListener('resize', calculateHeight);
+    return () => window.removeEventListener('resize', calculateHeight);
+  }, [selectedMealType, showImport]);
+
+  // Define all callback functions using useCallback to prevent unnecessary re-renders
   const updateRecipe = useCallback((id, updates) => {
     setRecipes(recipes.map(recipe => 
       recipe.id === id ? { ...recipe, ...updates } : recipe
@@ -76,228 +94,170 @@ function RecipesView({ recipes, setRecipes, openaiApiKey }) {
 
   const handleImportClick = useCallback(async () => {
     if (!importInput.trim()) {
-      alert('Please enter a recipe URL or paste recipe text!');
+      alert('Please enter a recipe URL or paste recipe text! 🔗');
       return;
     }
-    
+
     try {
-      const parsedRecipe = await handleImport(importInput);
-      if (parsedRecipe) {
-        setPendingRecipe(parsedRecipe);
-        setShowImportConfirmation(true);
-        setImportInput('');
-        setShowImport(false);
-      }
+      const parsedRecipe = await handleImport(importInput, selectedMealType);
+      setPendingRecipe(parsedRecipe);
+      setShowImportConfirmation(true);
+      setImportInput('');
+      setShowImport(false);
     } catch (error) {
-      alert('Error importing recipe: ' + error.message);
+      console.error('Import error:', error);
     }
-  }, [importInput, handleImport]);
+  }, [importInput, handleImport, selectedMealType]);
 
-  // If no meal type selected, show landing page
+  // Show landing page when no meal type selected
   if (!selectedMealType) {
-    return (
-      <>
-        <MealTypeLanding 
-          onSelectMealType={setSelectedMealType} 
-          recipes={recipes}
-          showImport={showImport}
-          setShowImport={setShowImport}
-          importInput={importInput}
-          setImportInput={setImportInput}
-          isImporting={isImporting}
-          openaiApiKey={openaiApiKey}
-          handleImportClick={handleImportClick}
-          // Pass search functionality to MealTypeLanding
-          allRecipes={recipes}
-          onRecipeClick={handleRecipeClick}
-        />
-        
-        {/* Import Confirmation Modal */}
-        <RecipeImportConfirmation
-          recipe={pendingRecipe}
-          isOpen={showImportConfirmation}
-          onConfirm={handleConfirmImport}
-          onCancel={handleCancelImport}
-        />
-
-        {/* Recipe Modal for MealTypeLanding */}
-        <RecipeModal
-          recipe={selectedRecipe}
-          isOpen={showRecipeModal}
-          onClose={handleCloseModal}
-          onUpdate={updateRecipe}
-          onDelete={deleteRecipe}
-          openaiApiKey={openaiApiKey}
-          onSaveScaled={handleSaveScaledRecipe}
-        />
-      </>
-    );
+    return <MealTypeLanding onSelectMealType={setSelectedMealType} />;
   }
 
   const mealInfo = getMealTypeInfo(selectedMealType);
 
   return (
-    <div style={{ 
-      fontFamily: 'Georgia, serif', 
-      color: '#2c1810',
-      background: 'white',
-      minHeight: '100vh'
-    }}>
+    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
       {/* Header Section */}
-      <div style={{
-        textAlign: 'center',
-        marginBottom: '30px',
-        padding: '20px'
-      }}>
-        <button
-          onClick={() => setSelectedMealType(null)}
-          style={{
-            background: '#f3f4f6',
-            border: '2px solid #e5e7eb',
-            color: '#6b7280',
-            padding: '10px 20px',
-            borderRadius: '12px',
-            cursor: 'pointer',
-            fontWeight: '600',
-            fontSize: '0.9rem',
-            fontFamily: 'Georgia, serif',
-            transition: 'all 0.3s ease',
-            marginBottom: '20px'
-          }}
-          onMouseOver={(e) => {
-            e.target.style.background = '#06b6d4';
-            e.target.style.borderColor = '#06b6d4';
-            e.target.style.color = 'white';
-          }}
-          onMouseOut={(e) => {
-            e.target.style.background = '#f3f4f6';
-            e.target.style.borderColor = '#e5e7eb';
-            e.target.style.color = '#6b7280';
-          }}
-        >
-          ← Back to Categories
-        </button>
-
-        <h1 style={{
-          fontSize: '3rem',
-          color: '#1f2937',
-          margin: '0 0 15px 0',
-          fontWeight: '700',
-          fontFamily: 'Georgia, serif'
-        }}>
-          {mealInfo.icon} {mealInfo.label}
-        </h1>
-        
-        {/* Recipe Count Box */}
+      <div ref={headerRef} style={{ flexShrink: 0 }}>
+        {/* Header with Back Button */}
         <div style={{
-          display: 'inline-block',
           background: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)',
+          padding: '25px 20px',
           color: 'white',
-          borderRadius: '15px',
-          padding: '10px 20px',
-          fontSize: '1rem',
-          fontWeight: '600',
-          boxShadow: '0 4px 15px rgba(6, 182, 212, 0.3)'
+          boxShadow: '0 4px 20px rgba(6, 182, 212, 0.2)'
         }}>
-          {filteredRecipes.length} {filteredRecipes.length === 1 ? 'recipe' : 'recipes'}
-        </div>
-        
-        {/* Import Button */}
-        <div style={{ position: 'relative', display: 'inline-block', marginLeft: '20px' }}>
-          <button
-            onClick={() => setShowImport(true)}
-            style={{
-              background: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)',
-              color: 'white',
-              border: 'none',
-              padding: '12px 20px',
-              borderRadius: '12px',
-              cursor: 'pointer',
-              fontWeight: '600',
-              fontSize: '0.9rem',
-              fontFamily: 'Georgia, serif',
-              boxShadow: '0 4px 15px rgba(6, 182, 212, 0.3)',
-              transition: 'all 0.3s ease'
-            }}
-            onMouseOver={(e) => {
-              e.target.style.transform = 'translateY(-2px)';
-              e.target.style.boxShadow = '0 6px 20px rgba(6, 182, 212, 0.4)';
-            }}
-            onMouseOut={(e) => {
-              e.target.style.transform = 'translateY(0)';
-              e.target.style.boxShadow = '0 4px 15px rgba(6, 182, 212, 0.3)';
-            }}
-          >
-            + Import Recipe
-          </button>
-          
-          {/* Recipe Import Modal */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '15px',
+            marginBottom: '20px'
+          }}>
+            <button
+              onClick={() => setSelectedMealType(null)}
+              style={{
+                background: 'rgba(255, 255, 255, 0.2)',
+                border: 'none',
+                color: 'white',
+                padding: '8px 16px',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+                fontSize: '0.9rem',
+                fontWeight: '600',
+                transition: 'all 0.2s ease',
+                WebkitTapHighlightColor: 'transparent'
+              }}
+              onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)'}
+              onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'}
+            >
+              ← Back to Categories
+            </button>
+          </div>
+
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '20px'
+          }}>
+            <div>
+              <h1 style={{
+                margin: 0,
+                fontSize: 'clamp(1.8rem, 4vw, 2.5rem)',
+                fontWeight: '800',
+                fontFamily: 'Georgia, serif',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '15px'
+              }}>
+                <span style={{ fontSize: '1.2em' }}>{mealInfo.icon}</span>
+                {mealInfo.title}
+              </h1>
+              <p style={{
+                margin: '8px 0 0 0',
+                fontSize: 'clamp(0.9rem, 2vw, 1.1rem)',
+                opacity: 0.9,
+                fontFamily: 'Georgia, serif'
+              }}>
+                {filteredRecipes.length} delicious {selectedMealType === 'all' ? 'recipes' : mealInfo.description}
+              </p>
+            </div>
+
+            <button
+              onClick={() => setShowImport(!showImport)}
+              style={{
+                background: 'white',
+                color: '#06b6d4',
+                border: 'none',
+                padding: '12px 24px',
+                borderRadius: '12px',
+                cursor: 'pointer',
+                fontWeight: '700',
+                fontSize: '1rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                boxShadow: '0 4px 15px rgba(0, 0, 0, 0.1)',
+                transition: 'all 0.2s ease',
+                WebkitTapHighlightColor: 'transparent'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.transform = 'translateY(-2px)';
+                e.currentTarget.style.boxShadow = '0 6px 20px rgba(0, 0, 0, 0.15)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 4px 15px rgba(0, 0, 0, 0.1)';
+              }}
+            >
+              <span style={{ fontSize: '1.2rem' }}>✨</span>
+              Import Recipe
+            </button>
+          </div>
+
+          {/* Import Section */}
           {showImport && (
             <div style={{
-              position: 'absolute',
-              top: '100%',
-              right: '0',
-              zIndex: 100,
-              marginTop: '10px',
-              background: 'white',
-              borderRadius: '15px',
+              marginTop: '20px',
+              background: 'rgba(255, 255, 255, 0.1)',
               padding: '20px',
-              boxShadow: '0 8px 25px rgba(0, 0, 0, 0.15)',
-              border: '1px solid #e5e7eb',
-              minWidth: '400px',
-              maxWidth: '500px'
+              borderRadius: '12px',
+              backdropFilter: 'blur(10px)'
             }}>
-              <textarea
-                placeholder="Paste recipe URL (https://...) or raw recipe text here..."
-                value={importInput}
-                onChange={(e) => setImportInput(e.target.value)}
-                disabled={isImporting}
-                style={{
-                  width: '100%',
-                  minHeight: '100px',
-                  padding: '12px',
-                  borderRadius: '8px',
-                  border: '2px solid #e5e7eb',
-                  fontSize: '0.9rem',
-                  outline: 'none',
-                  background: 'white',
-                  marginBottom: '15px',
-                  resize: 'vertical',
-                  fontFamily: 'Georgia, serif',
-                  boxSizing: 'border-box',
-                  transition: 'border-color 0.2s'
-                }}
-                onFocus={(e) => e.target.style.borderColor = '#06b6d4'}
-                onBlur={(e) => e.target.style.borderColor = '#e5e7eb'}
-              />
-              
-              <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                <button
-                  onClick={() => setShowImport(false)}
-                  style={{
-                    background: '#f3f4f6',
-                    color: '#6b7280',
-                    border: 'none',
-                    padding: '8px 16px',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    fontWeight: '600',
+              <div style={{
+                display: 'flex',
+                gap: '10px',
+                alignItems: 'flex-end'
+              }}>
+                <div style={{ flex: 1 }}>
+                  <label style={{
+                    display: 'block',
+                    marginBottom: '5px',
                     fontSize: '0.9rem',
-                    fontFamily: 'Georgia, serif',
-                    transition: 'all 0.2s'
-                  }}
-                  onMouseOver={(e) => {
-                    e.target.style.background = '#e5e7eb';
-                    e.target.style.color = '#4b5563';
-                  }}
-                  onMouseOut={(e) => {
-                    e.target.style.background = '#f3f4f6';
-                    e.target.style.color = '#6b7280';
-                  }}
-                >
-                  Cancel
-                </button>
-                
+                    fontWeight: '600'
+                  }}>
+                    Recipe URL or Text
+                  </label>
+                  <textarea
+                    value={importInput}
+                    onChange={(e) => setImportInput(e.target.value)}
+                    placeholder="Paste a recipe URL (e.g., from AllRecipes, Food Network) or paste recipe text..."
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      borderRadius: '8px',
+                      border: 'none',
+                      fontSize: '0.95rem',
+                      resize: 'vertical',
+                      minHeight: '60px',
+                      fontFamily: 'inherit'
+                    }}
+                  />
+                </div>
                 <button
                   onClick={handleImportClick}
                   disabled={isImporting || !importInput.trim() || !openaiApiKey}
@@ -315,7 +275,9 @@ function RecipesView({ recipes, setRecipes, openaiApiKey }) {
                     fontFamily: 'Georgia, serif',
                     boxShadow: isImporting || !importInput.trim() || !openaiApiKey
                       ? 'none' 
-                      : '0 2px 8px rgba(6, 182, 212, 0.3)'
+                      : '0 2px 8px rgba(6, 182, 212, 0.3)',
+                    minHeight: '44px',
+                    WebkitTapHighlightColor: 'transparent'
                   }}
                 >
                   {isImporting ? '🔄 Importing...' : '✨ Import'}
@@ -338,84 +300,77 @@ function RecipesView({ recipes, setRecipes, openaiApiKey }) {
             </div>
           )}
         </div>
+
+        {/* Filters */}
+        <div style={{ 
+          padding: '20px',
+          background: '#f8f9fa',
+          borderBottom: '1px solid #e5e7eb'
+        }}>
+          <FilterBar
+            searchTerm={searchTerm}
+            setSearchTerm={setSearchTerm}
+            filterCookTime={filterState.cookTime}
+            setFilterCookTime={(value) => updateFilter('cookTime', value)}
+            filterTags={filterState.tags}
+            setFilterTags={setFilterTags}
+            onClearFilters={clearFilters}
+            compact={true}
+          />
+        </div>
       </div>
 
-      {/* Compact Filters */}
-      <div style={{ padding: '0 20px' }}>
-        <FilterBar
-          searchTerm={searchTerm}
-          setSearchTerm={setSearchTerm}
-          filterCookTime={filterState.cookTime}
-          setFilterCookTime={(value) => updateFilter('cookTime', value)}
-          filterTags={filterState.tags}
-          setFilterTags={setFilterTags}
-          onClearFilters={clearFilters}
-          compact={true}
-        />
-      </div>
-
-      {/* Recipe Grid */}
-      <div style={{ padding: '0 20px' }}>
+      {/* Virtualized Recipe Grid */}
+      <div style={{ flex: 1, overflow: 'hidden', background: '#f8f9fa' }}>
         {filteredRecipes.length > 0 ? (
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
-            gap: '25px'
-          }}>
-            {filteredRecipes.map(recipe => (
-              <CompactSquareRecipeCard
-                key={recipe.id}
-                recipe={recipe}
-                onClick={handleRecipeClick}
-                onUpdate={updateRecipe}
-              />
-            ))}
+          <div style={{ padding: '20px', height: '100%' }}>
+            <VirtualizedRecipeGrid
+              recipes={filteredRecipes}
+              onRecipeClick={handleRecipeClick}
+              onRecipeUpdate={updateRecipe}
+              containerHeight={containerHeight}
+              hasMore={false}
+              loadMore={() => {}}
+              isLoading={false}
+            />
           </div>
         ) : (
           <div style={{
-            background: 'white',
-            borderRadius: '20px',
-            padding: '60px 30px',
-            textAlign: 'center',
-            color: '#6b7280',
-            boxShadow: '0 2px 15px rgba(0, 0, 0, 0.06)',
-            border: '1px solid #f0f0f0'
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            height: '100%',
+            padding: '20px'
           }}>
-            <div style={{ fontSize: '4rem', marginBottom: '20px' }}>{mealInfo.icon}</div>
-            <h3 style={{ margin: '0 0 10px 0', color: '#1f2937', fontSize: '1.5rem' }}>
-              {recipes.filter(r => selectedMealType === 'all' || r.mealType === selectedMealType).length > 0 
-                ? 'No recipes match your filters' 
-                : `No ${mealInfo.label.toLowerCase()} recipes found`}
-            </h3>
-            <p style={{ margin: '0 0 25px 0', color: '#6b7280' }}>
-              {recipes.filter(r => selectedMealType === 'all' || r.mealType === selectedMealType).length > 0
-                ? 'Try adjusting your search or filters above'
-                : `Import your first ${mealInfo.label.toLowerCase()} recipe to get started!`}
-            </p>
-            {recipes.filter(r => selectedMealType === 'all' || r.mealType === selectedMealType).length === 0 && (
-              <button
-                onClick={() => setShowImport(true)}
-                style={{
-                  background: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)',
-                  color: 'white',
-                  border: 'none',
-                  padding: '15px 30px',
-                  borderRadius: '15px',
-                  cursor: 'pointer',
-                  fontWeight: '600',
-                  fontSize: '1rem',
-                  fontFamily: 'Georgia, serif',
-                  boxShadow: '0 4px 15px rgba(6, 182, 212, 0.3)'
-                }}
-              >
-                ✨ Import Your First Recipe
-              </button>
-            )}
+            <div style={{
+              background: 'white',
+              borderRadius: '20px',
+              padding: '60px 30px',
+              textAlign: 'center',
+              color: '#6b7280',
+              boxShadow: '0 2px 15px rgba(0, 0, 0, 0.06)',
+              border: '1px solid #f0f0f0',
+              maxWidth: '400px'
+            }}>
+              <div style={{ fontSize: '4rem', marginBottom: '20px' }}>{mealInfo.icon}</div>
+              <h3 style={{ margin: '0 0 10px 0', color: '#1f2937', fontSize: '1.5rem' }}>
+                {recipes.filter(r => selectedMealType === 'all' || r.mealType === selectedMealType).length > 0 
+                  ? 'No recipes match your filters'
+                  : `No ${mealInfo.title.toLowerCase()} yet!`
+                }
+              </h3>
+              <p style={{ margin: 0, fontSize: '1rem' }}>
+                {recipes.filter(r => selectedMealType === 'all' || r.mealType === selectedMealType).length > 0 
+                  ? 'Try adjusting your filters or search terms'
+                  : 'Click "Import Recipe" to add your first one'
+                }
+              </p>
+            </div>
           </div>
         )}
       </div>
 
-      {/* Recipe Modal */}
+      {/* Modals */}
       <RecipeModal
         recipe={selectedRecipe}
         isOpen={showRecipeModal}
@@ -426,12 +381,11 @@ function RecipesView({ recipes, setRecipes, openaiApiKey }) {
         onSaveScaled={handleSaveScaledRecipe}
       />
 
-      {/* Import Confirmation Modal */}
       <RecipeImportConfirmation
-        recipe={pendingRecipe}
         isOpen={showImportConfirmation}
+        onClose={handleCancelImport}
+        pendingRecipe={pendingRecipe}
         onConfirm={handleConfirmImport}
-        onCancel={handleCancelImport}
       />
     </div>
   );

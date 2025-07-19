@@ -1,6 +1,7 @@
 {
-  "short_name": "React App",
-  "name": "Create React App Sample",
+  "short_name": "G&G Recipes",
+  "name": "Girl & The Gay Recipe App",
+  "description": "Your shared recipe hub for delicious meals and cooking inspiration",
   "icons": [
     {
       "src": "favicon.ico",
@@ -10,16 +11,53 @@
     {
       "src": "logo192.png",
       "type": "image/png",
-      "sizes": "192x192"
+      "sizes": "192x192",
+      "purpose": "any maskable"
     },
     {
       "src": "logo512.png",
       "type": "image/png",
-      "sizes": "512x512"
+      "sizes": "512x512",
+      "purpose": "any maskable"
     }
   ],
   "start_url": ".",
   "display": "standalone",
-  "theme_color": "#000000",
-  "background_color": "#ffffff"
+  "theme_color": "#06b6d4",
+  "background_color": "#ffffff",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "categories": ["food", "lifestyle"],
+  "screenshots": [
+    {
+      "src": "screenshot1.png",
+      "type": "image/png",
+      "sizes": "540x720",
+      "label": "Recipe collection view"
+    },
+    {
+      "src": "screenshot2.png",
+      "type": "image/png",
+      "sizes": "540x720",
+      "label": "Meal planning view"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "View Recipes",
+      "short_name": "Recipes",
+      "description": "Browse your recipe collection",
+      "url": "/?view=recipes",
+      "icons": [{ "src": "recipes-icon.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "Meal Plans",
+      "short_name": "Meals",
+      "description": "View your meal plans",
+      "url": "/?view=meals",
+      "icons": [{ "src": "meals-icon.png", "sizes": "96x96" }]
+    }
+  ],
+  "prefer_related_applications": false,
+  "related_applications": []
 }
