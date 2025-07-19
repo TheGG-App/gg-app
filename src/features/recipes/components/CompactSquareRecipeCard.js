@@ -17,7 +17,6 @@ function CompactSquareRecipeCard({ recipe, onClick, onUpdate }) {
     if (showTagMenu && tagButtonRef.current && cardRef.current && menuRef.current) {
       const buttonRect = tagButtonRef.current.getBoundingClientRect();
       const cardRect = cardRef.current.getBoundingClientRect();
-      const menuHeight = menuRef.current.offsetHeight;
       
       // Calculate position relative to card
       const buttonBottomRelativeToCard = buttonRect.bottom - cardRect.top;
