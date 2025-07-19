@@ -12,21 +12,21 @@
   justify-content: center;
   height: 100%;
   font-size: 1rem;
-  color: #6b7280;
+  color: var(--color-gray-500);
 }
 
 .loadingContent {
   text-align: center;
-  padding: 20px;
+  padding: var(--spacing-xl);
 }
 
 .spinner {
   width: 40px;
   height: 40px;
-  margin: 0 auto 10px;
+  margin: 0 auto var(--spacing-sm);
   border-radius: 50%;
-  border: 3px solid #e5e7eb;
-  border-top-color: #06b6d4;
+  border: 3px solid var(--color-gray-200);
+  border-top-color: var(--color-primary);
   animation: spin 0.8s linear infinite;
 }
 
