@@ -4,13 +4,14 @@ import { collection, query, onSnapshot, doc, updateDoc, addDoc, deleteDoc } from
 import { db } from '../../../config/firebase';
 import { useAuth } from '../../../contexts/AuthContext';
 import VirtualizedRecipeGrid from './VirtualizedRecipeGrid';
-import RecipeDetailModal from './RecipeDetailModal';
+import RecipeModal from './RecipeModal';
 
 function RecipeManager() {
   const { user, isAdmin, isPrivileged } = useAuth();
   const [recipes, setRecipes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedRecipe, setSelectedRecipe] = useState(null);
+  const [openaiApiKey, setOpenaiApiKey] = useState(''); // Add if you use AI features
 
   // Subscribe to recipes collection
   useEffect(() => {
@@ -65,16 +66,20 @@ function RecipeManager() {
 
     const newRecipe = {
       title: "New Recipe",
-      image: "https://via.placeholder.com/400x300?text=New+Recipe",
+      image: "",
       cookTime: "30 mins",
+      mealType: "Dinner",
       nutrition: {
         calories: 0,
         protein: 0,
+        carbs: 0,
+        fat: 0,
+        fiber: 0,
         servings: 4
       },
       tags: {},
-      ingredients: [],
-      instructions: [],
+      ingredients: "",
+      instructions: "",
       createdBy: user.uid,
       createdByEmail: user.email,
       createdAt: new Date(),
@@ -84,7 +89,7 @@ function RecipeManager() {
     try {
       const docRef = await addDoc(collection(db, 'recipes'), newRecipe);
       console.log('Recipe created with ID:', docRef.id);
-      // Optionally open the recipe for editing
+      // Open the new recipe for editing
       setSelectedRecipe({ id: docRef.id, ...newRecipe });
     } catch (error) {
       console.error('Error creating recipe:', error);
@@ -99,16 +104,34 @@ function RecipeManager() {
       return;
     }
 
-    if (!window.confirm('Are you sure you want to delete this recipe?')) {
-      return;
-    }
-
     try {
       await deleteDoc(doc(db, 'recipes', recipeId));
       setSelectedRecipe(null);
     } catch (error) {
       console.error('Error deleting recipe:', error);
       alert('Failed to delete recipe. Please try again.');
+    }
+  };
+
+  // Handle saving scaled recipes
+  const handleSaveScaled = async (scaledRecipe) => {
+    if (!isPrivileged) {
+      alert('You do not have permission to save recipes.');
+      return;
+    }
+
+    try {
+      const docRef = await addDoc(collection(db, 'recipes'), {
+        ...scaledRecipe,
+        createdBy: user.uid,
+        createdByEmail: user.email,
+        createdAt: new Date(),
+        lastUpdatedAt: new Date()
+      });
+      console.log('Scaled recipe saved with ID:', docRef.id);
+    } catch (error) {
+      console.error('Error saving scaled recipe:', error);
+      alert('Failed to save scaled recipe. Please try again.');
     }
   };
 
@@ -171,14 +194,16 @@ function RecipeManager() {
         containerHeight={window.innerHeight - 200}
       />
 
-      {/* Recipe Detail Modal */}
+      {/* Recipe Modal */}
       {selectedRecipe && (
-        <RecipeDetailModal
+        <RecipeModal
           recipe={selectedRecipe}
+          isOpen={!!selectedRecipe}
           onClose={() => setSelectedRecipe(null)}
-          onUpdate={isPrivileged ? (updates) => handleRecipeUpdate(selectedRecipe.id, updates) : null}
-          onDelete={isPrivileged ? () => handleDeleteRecipe(selectedRecipe.id) : null}
-          isPrivileged={isPrivileged}
+          onUpdate={isPrivileged ? handleRecipeUpdate : null}
+          onDelete={isPrivileged ? handleDeleteRecipe : null}
+          openaiApiKey={openaiApiKey}
+          onSaveScaled={isPrivileged ? handleSaveScaled : null}
         />
       )}
     </div>
