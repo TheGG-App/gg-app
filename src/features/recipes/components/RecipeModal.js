@@ -10,7 +10,6 @@ function RecipeModal({ recipe, isOpen, onClose, onUpdate, onDelete, openaiApiKey
   const [targetServings, setTargetServings] = useState('');
   const [isScaling, setIsScaling] = useState(false);
   const [showScaleInput, setShowScaleInput] = useState(false);
-  const [selectedFile, setSelectedFile] = useState(null);
 
   // Reset state when modal opens/closes
   useEffect(() => {
@@ -82,8 +81,6 @@ function RecipeModal({ recipe, isOpen, onClose, onUpdate, onDelete, openaiApiKey
         return;
       }
 
-      setSelectedFile(file);
-      
       // Create a data URL for the image
       const reader = new FileReader();
       reader.onload = (e) => {

@@ -2,7 +2,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { VariableSizeGrid as Grid } from 'react-window';
 import InfiniteLoader from 'react-window-infinite-loader';
-import CompactSquareRecipeCard from './CompactSquareRecipeCard';
 import OptimizedImage from '../../../shared/components/OptimizedImage';
 
 function VirtualizedRecipeGrid({ 
