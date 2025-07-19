@@ -1,77 +1,236 @@
-// src/shared/components/LandingPage.js - Logo only
-import React from 'react';
+// src/shared/components/LandingPage.js
+import React, { useState } from 'react';
+import IconSettings from '../../features/settings/IconSettings';
+import styles from './LandingPage.module.css';
 
-function LandingPage({ setCurrentView, user, onSignIn }) {
+function LandingPage({ 
+  onNavigate, 
+  navigationData, 
+  user, 
+  onSignIn, 
+  onSignOut,
+  openaiApiKey,
+  setOpenaiApiKey 
+}) {
+  const [showApiKeyInput, setShowApiKeyInput] = useState(false);
+  const [apiKeyInput, setApiKeyInput] = useState('');
+  const [isSettingKey, setIsSettingKey] = useState(false);
+
+  const handleSetApiKey = async () => {
+    if (!apiKeyInput.trim()) return;
+    
+    setIsSettingKey(true);
+    try {
+      await setOpenaiApiKey(apiKeyInput.trim());
+      setApiKeyInput('');
+      setShowApiKeyInput(false);
+      alert('API key saved successfully!');
+    } catch (error) {
+      alert('Failed to save API key: ' + error.message);
+    } finally {
+      setIsSettingKey(false);
+    }
+  };
+
+  const handleRemoveApiKey = async () => {
+    if (window.confirm('Are you sure you want to remove your API key?')) {
+      await setOpenaiApiKey('');
+      alert('API key removed');
+    }
+  };
+
+  // Calculate stats
+  const totalItems = navigationData.recipesCount + navigationData.mealsCount;
+  const mealTypes = ['breakfast', 'lunch', 'dinner', 'snack', 'dessert', 'drinks'];
+
   return (
-    <div style={{
-      minHeight: '100vh',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      background: 'white',
-      padding: '20px'
-    }}>
-      <div style={{
-        textAlign: 'center',
-        cursor: 'pointer'
-      }}
-      onClick={() => user && setCurrentView('recipes')}
-      >
-        {/* Logo Only */}
-        <img 
-          src="/logo.png" // Update this with your logo path
-          alt="G&G Recipe Collection"
-          style={{
-            maxWidth: '400px',
-            width: '100%',
-            height: 'auto'
-          }}
-        />
-        
-        {/* Sign In Prompt (if not signed in) */}
-        {!user && (
-          <div style={{
-            marginTop: '60px'
-          }}>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onSignIn();
-              }}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '8px',
-                background: 'linear-gradient(135deg, #4285f4 0%, #3367d6 100%)',
-                color: 'white',
-                border: 'none',
-                padding: '12px 24px',
-                borderRadius: '12px',
-                cursor: 'pointer',
-                fontWeight: '600',
-                fontSize: '1rem',
-                boxShadow: '0 4px 15px rgba(66, 133, 244, 0.3)',
-                transition: 'all 0.3s ease'
-              }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.transform = 'translateY(-2px)';
-                e.currentTarget.style.boxShadow = '0 6px 20px rgba(66, 133, 244, 0.4)';
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = '0 4px 15px rgba(66, 133, 244, 0.3)';
-              }}
-            >
-              <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                <path fillRule="evenodd" clipRule="evenodd" d="M17.64 9.20443C17.64 8.56625 17.5827 7.95262 17.4764 7.36353H9V10.8449H13.8436C13.635 11.9699 13.0009 12.9231 12.0477 13.5613V15.8194H14.9564C16.6582 14.2526 17.64 11.9453 17.64 9.20443Z" fill="white"/>
-                <path fillRule="evenodd" clipRule="evenodd" d="M9 18C11.43 18 13.4673 17.1941 14.9564 15.8195L12.0477 13.5613C11.2418 14.1013 10.2109 14.4204 9 14.4204C6.65591 14.4204 4.67182 12.8372 3.96409 10.71H0.957275V13.0418C2.43818 15.9831 5.48182 18 9 18Z" fill="white"/>
-                <path fillRule="evenodd" clipRule="evenodd" d="M3.96409 10.7101C3.78409 10.1701 3.68182 9.59325 3.68182 9.00007C3.68182 8.40689 3.78409 7.83007 3.96409 7.29007V4.95825H0.957273C0.347727 6.17325 0 7.54755 0 9.00007C0 10.4526 0.347727 11.8269 0.957273 13.0419L3.96409 10.7101Z" fill="white"/>
-                <path fillRule="evenodd" clipRule="evenodd" d="M9 3.57955C10.3214 3.57955 11.5077 4.03364 12.4405 4.92545L15.0218 2.34409C13.4632 0.891818 11.4259 0 9 0C5.48182 0 2.43818 2.01682 0.957275 4.95818L3.96409 7.29C4.67182 5.16273 6.65591 3.57955 9 3.57955Z" fill="white"/>
-              </svg>
-              Sign in with Google
-            </button>
+    <div className={styles.container}>
+      <div className={styles.content}>
+        {/* Header */}
+        <header className={styles.header}>
+          <div className={styles.logo}>👩‍🍳</div>
+          <h1 className={styles.title}>Recipe Collection</h1>
+          <p className={styles.subtitle}>Your personal cookbook in the cloud</p>
+        </header>
+
+        {/* User Section */}
+        <div className={styles.userSection}>
+          {user ? (
+            <>
+              <div className={styles.userInfo}>
+                <img
+                  src={user.photoURL}
+                  alt={user.displayName}
+                  className={styles.userAvatar}
+                />
+                <div>
+                  <div className={styles.userName}>{user.displayName}</div>
+                  <div className={styles.userEmail}>{user.email}</div>
+                </div>
+              </div>
+              <button onClick={onSignOut} className="btn btn-secondary">
+                Sign Out
+              </button>
+            </>
+          ) : (
+            <>
+              <p className={styles.signInPrompt}>
+                Sign in to sync your recipes across devices
+              </p>
+              <button onClick={onSignIn} className="btn btn-primary">
+                <span>🔑</span> Sign in with Google
+              </button>
+            </>
+          )}
+        </div>
+
+        {/* Navigation Cards */}
+        <div className={styles.navGrid}>
+          <div 
+            className={styles.navCard}
+            onClick={() => onNavigate('recipes')}
+          >
+            <div className={styles.navIcon}>🍽️</div>
+            <h2 className={styles.navTitle}>Recipes</h2>
+            <div className={styles.navCount}>{navigationData.recipesCount}</div>
+            <p className={styles.navDescription}>
+              Browse and manage your recipe collection
+            </p>
           </div>
-        )}
+
+          <div 
+            className={styles.navCard}
+            onClick={() => onNavigate('meals')}
+          >
+            <div className={styles.navIcon}>🍱</div>
+            <h2 className={styles.navTitle}>Meal Combos</h2>
+            <div className={styles.navCount}>{navigationData.mealsCount}</div>
+            <p className={styles.navDescription}>
+              Create and organize meal combinations
+            </p>
+          </div>
+        </div>
+
+        {/* Settings Section */}
+        <div className={styles.settingsSection}>
+          <div className={styles.settingsHeader}>
+            <h2 className={styles.settingsTitle}>⚙️ Settings</h2>
+          </div>
+
+          {/* API Key Management */}
+          <div className={styles.apiKeySection}>
+            <div className={`${styles.apiKeyStatus} ${navigationData.hasApiKey ? styles.configured : styles.missing}`}>
+              <span>{navigationData.hasApiKey ? '✅' : '⚠️'}</span>
+              <span>
+                OpenAI API Key: {navigationData.hasApiKey ? 'Configured' : 'Not configured'}
+              </span>
+            </div>
+            
+            <p style={{ fontSize: '0.9rem', color: 'var(--color-gray-600)', margin: '0 0 var(--spacing-md) 0' }}>
+              Required for importing recipes from URLs
+            </p>
+
+            {!showApiKeyInput && !navigationData.hasApiKey && (
+              <button 
+                onClick={() => setShowApiKeyInput(true)}
+                className="btn btn-primary btn-sm"
+              >
+                Add API Key
+              </button>
+            )}
+
+            {!showApiKeyInput && navigationData.hasApiKey && (
+              <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
+                <button 
+                  onClick={() => setShowApiKeyInput(true)}
+                  className="btn btn-secondary btn-sm"
+                >
+                  Update Key
+                </button>
+                <button 
+                  onClick={handleRemoveApiKey}
+                  className="btn btn-danger btn-sm"
+                >
+                  Remove Key
+                </button>
+              </div>
+            )}
+
+            {showApiKeyInput && (
+              <div className={styles.apiKeyForm}>
+                <input
+                  type="password"
+                  value={apiKeyInput}
+                  onChange={(e) => setApiKeyInput(e.target.value)}
+                  placeholder="sk-..."
+                  className={`input ${styles.apiKeyInput}`}
+                  disabled={isSettingKey}
+                />
+                <button
+                  onClick={handleSetApiKey}
+                  disabled={!apiKeyInput.trim() || isSettingKey}
+                  className="btn btn-primary"
+                >
+                  {isSettingKey ? 'Saving...' : 'Save'}
+                </button>
+                <button
+                  onClick={() => {
+                    setShowApiKeyInput(false);
+                    setApiKeyInput('');
+                  }}
+                  className="btn btn-secondary"
+                  disabled={isSettingKey}
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Icon Settings */}
+          {openaiApiKey && (
+            <IconSettings 
+              userId={user?.uid} 
+              openaiApiKey={openaiApiKey}
+            />
+          )}
+
+          {/* Quick Stats */}
+          <div className={styles.statsGrid}>
+            <div className={styles.statCard}>
+              <div className={styles.statValue}>{totalItems}</div>
+              <div className={styles.statLabel}>Total Items</div>
+            </div>
+            <div className={styles.statCard}>
+              <div className={styles.statValue}>{mealTypes.length}</div>
+              <div className={styles.statLabel}>Categories</div>
+            </div>
+            <div className={styles.statCard}>
+              <div className={styles.statValue}>
+                {user ? '☁️' : '💾'}
+              </div>
+              <div className={styles.statLabel}>
+                {user ? 'Cloud Sync' : 'Local Only'}
+              </div>
+            </div>
+            <div className={styles.statCard}>
+              <div className={styles.statValue}>
+                {navigationData.hasApiKey ? '✅' : '❌'}
+              </div>
+              <div className={styles.statLabel}>AI Ready</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <footer style={{ 
+          textAlign: 'center', 
+          padding: 'var(--spacing-2xl) 0',
+          color: 'var(--color-gray-500)',
+          fontSize: '0.9rem'
+        }}>
+          Made with ❤️ for home cooks everywhere
+        </footer>
       </div>
     </div>
   );

@@ -1,7 +1,10 @@
-// src/features/meals/MealsView.js - Modern version with updated header
-import React, { useState, useEffect } from 'react';
+// src/features/meals/MealsView.js
+import React, { useState, useEffect, useRef } from 'react';
 import MealBuilder from './components/MealBuilder';
 import FilterBar from '../../shared/components/FilterBar';
+import { BASIC_TAGS } from '../recipes/utils/recipeUtils';
+import { scaleWithAI } from '../../shared/utils/aiHelpers';
+import styles from './MealsView.module.css';
 
 function MealsView({ meals, setMeals, recipes, openaiApiKey }) {
   const [filterMealType, setFilterMealType] = useState('all');
@@ -12,6 +15,8 @@ function MealsView({ meals, setMeals, recipes, openaiApiKey }) {
   const [showMealBuilder, setShowMealBuilder] = useState(false);
   const [expandedMeal, setExpandedMeal] = useState(null);
   const [expandedTagMenu, setExpandedTagMenu] = useState(null);
+  const [isScaling, setIsScaling] = useState({});
+  const menuRefs = useRef({});
 
   const mealTypes = ['breakfast', 'lunch', 'dinner', 'snack', 'dessert', 'drinks'];
 
@@ -30,6 +35,32 @@ function MealsView({ meals, setMeals, recipes, openaiApiKey }) {
   const deleteMeal = (id) => {
     if (window.confirm('Are you sure you want to delete this meal?')) {
       setMeals(meals.filter(meal => meal.id !== id));
+    }
+  };
+
+  const scaleMeal = async (meal, targetServings) => {
+    if (!targetServings || targetServings <= 0) {
+      alert('Please enter a valid number of servings');
+      return;
+    }
+
+    setIsScaling({ ...isScaling, [meal.id]: true });
+    try {
+      const scaled = await scaleWithAI(meal, targetServings, openaiApiKey, true, false);
+      
+      const newMeal = {
+        ...scaled,
+        id: Date.now(),
+        title: `${meal.title} (${targetServings} servings)`,
+        isMeal: true
+      };
+      
+      setMeals([...meals, newMeal]);
+      alert('Scaled meal saved! ✨');
+    } catch (error) {
+      alert('Error scaling meal: ' + error.message);
+    } finally {
+      setIsScaling({ ...isScaling, [meal.id]: false });
     }
   };
 
@@ -53,542 +84,263 @@ function MealsView({ meals, setMeals, recipes, openaiApiKey }) {
   }, [expandedTagMenu]);
 
   return (
-    <div>
-      {/* Header Section */}
-      <div style={{
-        textAlign: 'center',
-        marginBottom: '30px'
-      }}>
-        <h1 style={{
-          fontSize: '3rem',
-          color: '#1f2937',
-          margin: '0 0 15px 0',
-          fontWeight: '700',
-          fontFamily: 'Georgia, serif'
-        }}>
-          🍽️ Your Meals
-        </h1>
+    <div className={styles.container}>
+      {/* Header */}
+      <div className={styles.header}>
+        <h1 className={styles.title}>🍽️ Your Meals</h1>
         
-        {/* Meal Count Box */}
-        <div style={{
-          display: 'inline-block',
-          background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
-          color: 'white',
-          borderRadius: '15px',
-          padding: '10px 20px',
-          fontSize: '1rem',
-          fontWeight: '600',
-          boxShadow: '0 4px 15px rgba(34, 197, 94, 0.3)',
-          marginBottom: '20px'
-        }}>
+        <div className={styles.mealCount}>
           {meals.length} {meals.length === 1 ? 'meal' : 'meals'}
         </div>
         
-        <div>
-          <button
-            onClick={() => setShowMealBuilder(!showMealBuilder)}
-            style={{
-              background: '#BF5B4B',
-              color: 'white',
-              border: 'none',
-              padding: '15px 25px',
-              borderRadius: '15px',
-              cursor: 'pointer',
-              fontWeight: '600',
-              fontSize: '1rem',
-              boxShadow: '0 4px 15px rgba(191, 91, 75, 0.3)',
-              transition: 'all 0.2s ease',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '8px'
-            }}
-            onMouseOver={(e) => e.target.style.transform = 'translateY(-2px)'}
-            onMouseOut={(e) => e.target.style.transform = 'translateY(0)'}
-          >
-            <span>{showMealBuilder ? '✕' : '+'}</span>
-            {showMealBuilder ? 'Cancel' : 'Create Meal'}
-          </button>
-        </div>
+        <button
+          onClick={() => setShowMealBuilder(true)}
+          className="btn btn-primary"
+        >
+          + Create New Meal
+        </button>
       </div>
 
-      {/* Meal Builder */}
+      {/* Filters */}
+      <div className={styles.filtersContainer}>
+        <FilterBar
+          filterMealType={filterMealType}
+          setFilterMealType={setFilterMealType}
+          filterTags={filterTags}
+          setFilterTags={setFilterTags}
+          mealTypes={mealTypes}
+          onClearFilters={() => {
+            setFilterMealType('all');
+            setFilterTags({ familyApproved: false, mealPrep: false });
+          }}
+          title="Filter Meals"
+          compact={true}
+        />
+      </div>
+
+      {/* Meal Builder Modal */}
       {showMealBuilder && (
-        <div style={{
-          background: '#F0D0C1',
-          borderRadius: '20px',
-          padding: '25px',
-          marginBottom: '30px',
-          border: '2px solid #EEB182',
-          boxShadow: '0 4px 15px rgba(139, 90, 60, 0.1)'
-        }}>
-          <MealBuilder 
-            recipes={recipes}
-            onMealCreated={addMeal}
-          />
-        </div>
+        <MealBuilder
+          recipes={recipes}
+          onMealCreated={addMeal}
+          onClose={() => setShowMealBuilder(false)}
+        />
       )}
 
-      {/* Filter Bar */}
-      <FilterBar 
-        filterMealType={filterMealType}
-        setFilterMealType={setFilterMealType}
-        filterTags={filterTags}
-        setFilterTags={setFilterTags}
-        mealTypes={mealTypes}
-        title="Filter Meals"
-      />
+      {/* Meals List */}
+      <div className={styles.mealsList}>
+        {filteredMeals.length > 0 ? (
+          filteredMeals.map(meal => {
+            const isExpanded = expandedMeal === meal.id;
+            const hasTagMenu = expandedTagMenu === meal.id;
+            
+            return (
+              <div key={meal.id} className={styles.mealCard}>
+                <div
+                  onClick={() => setExpandedMeal(isExpanded ? null : meal.id)}
+                  className={`${styles.mealHeader} ${isExpanded ? styles.expanded : ''}`}
+                >
+                  <div className={styles.mealIcon}>🍽️</div>
 
-      {/* Meal Cards */}
-      {filteredMeals.length > 0 ? (
-        filteredMeals.map(meal => {
-          const isExpanded = expandedMeal === meal.id;
-          const ingredientsList = meal.ingredients ? meal.ingredients.split('\n').filter(ing => ing.trim()) : [];
-          const instructionsList = meal.instructions ? meal.instructions.split('\n').filter(inst => inst.trim()) : [];
-          
-          return (
-            <div
-              key={meal.id}
-              style={{
-                background: 'white',
-                borderRadius: '15px',
-                marginBottom: '20px',
-                boxShadow: '0 4px 15px rgba(139, 90, 60, 0.1)',
-                border: '1px solid #EEB182',
-                overflow: 'hidden',
-                transition: 'all 0.2s ease'
-              }}
-            >
-              {/* Meal Header - Clickable */}
-              <div 
-                onClick={() => setExpandedMeal(isExpanded ? null : meal.id)}
-                style={{
-                  padding: '20px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '20px',
-                  cursor: 'pointer',
-                  borderBottom: isExpanded ? '1px solid #EEB182' : 'none'
-                }}
-              >
-                {/* Meal Icon */}
-                <div style={{
-                  width: '120px',
-                  height: '80px',
-                  borderRadius: '10px',
-                  background: 'linear-gradient(135deg, #BF5B4B 0%, #CA8462 100%)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '2.5rem',
-                  color: 'white'
-                }}>
-                  🍽️
-                </div>
-
-                {/* Meal Info */}
-                <div style={{ flex: 1 }}>
-                  <h3 style={{
-                    margin: '0 0 8px 0',
-                    fontSize: '1.4rem',
-                    fontWeight: '600',
-                    color: '#333'
-                  }}>
-                    🍽️ {meal.title}
-                  </h3>
-                  
-                  <div style={{
-                    display: 'flex',
-                    gap: '20px',
-                    fontSize: '0.9rem',
-                    color: '#666',
-                    marginBottom: '10px'
-                  }}>
-                    {meal.nutrition?.servings && (
-                      <span><strong>Servings:</strong> {meal.nutrition.servings}</span>
-                    )}
-                    {meal.nutrition?.calories && (
-                      <span><strong>Calories:</strong> {meal.nutrition.calories}</span>
-                    )}
-                    <span><strong>Type:</strong> {meal.mealType.charAt(0).toUpperCase() + meal.mealType.slice(1)}</span>
-                    {meal.recipes && (
-                      <span><strong>Recipes:</strong> {meal.recipes.length}</span>
-                    )}
-                  </div>
-
-                  {/* Tags */}
-                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                    <span style={{
-                      background: '#BF5B4B',
-                      color: 'white',
-                      padding: '4px 10px',
-                      borderRadius: '12px',
-                      fontSize: '0.8rem',
-                      fontWeight: '500'
-                    }}>
-                      Multi-Recipe Meal
-                    </span>
+                  <div className={styles.mealInfo}>
+                    <h3 className={styles.mealTitle}>🍽️ {meal.title}</h3>
                     
-                    {meal.tags?.familyApproved && (
-                      <span style={{
-                        background: '#22c55e',
-                        color: 'white',
-                        padding: '4px 10px',
-                        borderRadius: '12px',
-                        fontSize: '0.8rem',
-                        fontWeight: '500'
-                      }}>
-                        👨‍👩‍👧‍👦 Family Approved
-                      </span>
-                    )}
-                    
-                    {meal.tags?.mealPrep && (
-                      <span style={{
-                        background: '#8B5A3C',
-                        color: 'white',
-                        padding: '4px 10px',
-                        borderRadius: '12px',
-                        fontSize: '0.8rem',
-                        fontWeight: '500'
-                      }}>
-                        🥘 Meal Prep
-                      </span>
-                    )}
-                  </div>
-                </div>
+                    <div className={styles.mealMeta}>
+                      {meal.nutrition?.servings && (
+                        <span><strong>Servings:</strong> {meal.nutrition.servings}</span>
+                      )}
+                      {meal.nutrition?.calories && (
+                        <span><strong>Calories:</strong> {meal.nutrition.calories}</span>
+                      )}
+                      <span><strong>Type:</strong> {meal.mealType.charAt(0).toUpperCase() + meal.mealType.slice(1)}</span>
+                      {meal.recipes && (
+                        <span><strong>Recipes:</strong> {meal.recipes.length}</span>
+                      )}
+                    </div>
 
-                {/* Expand Arrow */}
-                <div style={{
-                  fontSize: '1.5rem',
-                  color: '#8B5A3C',
-                  transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
-                  transition: 'transform 0.2s ease'
-                }}>
-                  ▼
-                </div>
-              </div>
-
-              {/* Expanded Content */}
-              {isExpanded && (
-                <div style={{ padding: '25px' }}>
-                  {/* Action Buttons */}
-                  <div style={{
-                    display: 'flex',
-                    gap: '10px',
-                    marginBottom: '25px',
-                    flexWrap: 'wrap',
-                    position: 'relative'
-                  }}>
-                    {/* Tags with Edit Button */}
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flex: 1 }}>
+                    <div className={styles.mealTags}>
+                      <span className={styles.mealTag}>Multi-Recipe Meal</span>
+                      
                       {meal.tags?.familyApproved && (
-                        <span style={{
-                          background: '#22c55e',
-                          color: 'white',
-                          padding: '6px 12px',
-                          borderRadius: '10px',
-                          fontSize: '0.85rem',
-                          fontWeight: '500'
-                        }}>
-                          👨‍👩‍👧‍👦 Family Approved
+                        <span className={`${styles.mealTag} ${styles.familyApproved}`}>
+                          ⭐ Family Approved
                         </span>
                       )}
                       
                       {meal.tags?.mealPrep && (
-                        <span style={{
-                          background: '#8B5A3C',
-                          color: 'white',
-                          padding: '6px 12px',
-                          borderRadius: '10px',
-                          fontSize: '0.85rem',
-                          fontWeight: '500'
-                        }}>
-                          🥘 Meal Prep
+                        <span className={`${styles.mealTag} ${styles.mealPrep}`}>
+                          📦 Meal Prep
                         </span>
                       )}
-                      
-                      {/* Add Tags Button */}
-                      <div className="tag-menu-container" style={{ position: 'relative' }}>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            const mealId = meal.id;
-                            setExpandedTagMenu(expandedTagMenu === mealId ? null : mealId);
-                          }}
-                          style={{
-                            background: expandedTagMenu === meal.id ? '#06b6d4' : '#f3f4f6',
-                            color: expandedTagMenu === meal.id ? 'white' : '#6b7280',
-                            border: 'none',
-                            borderRadius: '50%',
-                            width: '28px',
-                            height: '28px',
-                            cursor: 'pointer',
-                            fontSize: '0.9rem',
-                            fontWeight: 'bold',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            transition: 'all 0.2s ease'
-                          }}
-                          onMouseOver={(e) => {
-                            if (expandedTagMenu !== meal.id) {
-                              e.target.style.background = '#06b6d4';
-                              e.target.style.color = 'white';
-                              e.target.style.transform = 'scale(1.1)';
-                            }
-                          }}
-                          onMouseOut={(e) => {
-                            if (expandedTagMenu !== meal.id) {
-                              e.target.style.background = '#f3f4f6';
-                              e.target.style.color = '#6b7280';
-                              e.target.style.transform = 'scale(1)';
-                            }
-                          }}
-                        >
-                          +
-                        </button>
-
-                        {/* Tag Menu */}
-                        {expandedTagMenu === meal.id && (
-                          <div
-                            style={{
-                              position: 'absolute',
-                              top: '100%',
-                              left: '0',
-                              marginTop: '5px',
-                              background: 'white',
-                              borderRadius: '12px',
-                              minWidth: '200px',
-                              boxShadow: '0 8px 20px rgba(0, 0, 0, 0.15)',
-                              border: '1px solid #e5e7eb',
-                              zIndex: 10,
-                              padding: '12px'
-                            }}
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            {/* Basic Tags */}
-                            <div style={{ marginBottom: '12px' }}>
-                              <div style={{
-                                fontSize: '0.7rem',
-                                fontWeight: '600',
-                                color: '#9ca3af',
-                                marginBottom: '8px',
-                                textTransform: 'uppercase',
-                                letterSpacing: '0.5px'
-                              }}>
-                                Basic Tags
-                              </div>
-                              <label style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '8px',
-                                cursor: 'pointer',
-                                padding: '6px 0',
-                                fontSize: '0.85rem'
-                              }}>
-                                <input
-                                  type="checkbox"
-                                  checked={meal.tags?.familyApproved || false}
-                                  onChange={(e) => updateMeal(meal.id, {
-                                    tags: { ...meal.tags, familyApproved: e.target.checked }
-                                  })}
-                                  style={{ 
-                                    width: '14px', 
-                                    height: '14px',
-                                    accentColor: '#22c55e'
-                                  }}
-                                />
-                                <span style={{ color: '#374151' }}>
-                                  Family Approved
-                                </span>
-                              </label>
-                              <label style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '8px',
-                                cursor: 'pointer',
-                                padding: '6px 0',
-                                fontSize: '0.85rem'
-                              }}>
-                                <input
-                                  type="checkbox"
-                                  checked={meal.tags?.mealPrep || false}
-                                  onChange={(e) => updateMeal(meal.id, {
-                                    tags: { ...meal.tags, mealPrep: e.target.checked }
-                                  })}
-                                  style={{ 
-                                    width: '14px', 
-                                    height: '14px',
-                                    accentColor: '#22c55e'
-                                  }}
-                                />
-                                <span style={{ color: '#374151' }}>
-                                  Meal Prep
-                                </span>
-                              </label>
-                            </div>
-                          </div>
-                        )}
-                      </div>
                     </div>
-                    {/* Delete Button */}
-                    <button 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        deleteMeal(meal.id);
-                      }}
-                      style={{
-                        background: '#ef4444',
-                        color: 'white',
-                        border: 'none',
-                        padding: '8px 15px',
-                        borderRadius: '8px',
-                        cursor: 'pointer',
-                        fontSize: '0.9rem',
-                        fontWeight: '500',
-                        marginLeft: 'auto'
-                      }}
+                  </div>
+
+                  {/* Actions */}
+                  <div className={styles.mealActions} onClick={(e) => e.stopPropagation()}>
+                    <div className={`tag-menu-container ${styles.tagMenuContainer}`}>
+                      <button
+                        onClick={() => setExpandedTagMenu(hasTagMenu ? null : meal.id)}
+                        className="btn btn-secondary btn-sm"
+                      >
+                        🏷️ Tags
+                      </button>
+                      
+                      {hasTagMenu && (
+                        <div className={styles.tagMenu} ref={el => menuRefs.current[meal.id] = el}>
+                          {BASIC_TAGS.map(tag => (
+                            <label key={tag.key} className={styles.tagOption}>
+                              <input
+                                type="checkbox"
+                                checked={meal.tags?.[tag.key] || false}
+                                onChange={(e) => updateMeal(meal.id, {
+                                  tags: { ...meal.tags, [tag.key]: e.target.checked }
+                                })}
+                                className={styles.tagCheckbox}
+                              />
+                              <span>{tag.icon} {tag.label}</span>
+                            </label>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <button
+                      onClick={() => deleteMeal(meal.id)}
+                      className="btn btn-danger btn-sm"
                     >
-                      🗑️ Delete
+                      🗑️
                     </button>
                   </div>
-
-                  {/* Meal Content Grid */}
-                  <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: '1fr 1fr',
-                    gap: '25px',
-                    marginBottom: '20px'
-                  }}>
-                    {/* Combined Ingredients */}
-                    <div>
-                      <h4 style={{
-                        margin: '0 0 15px 0',
-                        color: '#8B5A3C',
-                        fontSize: '1.2rem',
-                        fontWeight: '600'
-                      }}>
-                        🛒 Combined Ingredients
-                      </h4>
-                      <ul style={{
-                        listStyle: 'none',
-                        padding: 0,
-                        margin: 0
-                      }}>
-                        {ingredientsList.map((ingredient, index) => (
-                          <li key={index} style={{
-                            marginBottom: '8px',
-                            display: 'flex',
-                            alignItems: 'flex-start',
-                            gap: '10px'
-                          }}>
-                            <span style={{
-                              width: '8px',
-                              height: '8px',
-                              background: '#BF5B4B',
-                              borderRadius: '50%',
-                              marginTop: '6px',
-                              flexShrink: 0
-                            }}></span>
-                            <span style={{
-                              color: '#333',
-                              lineHeight: '1.4'
-                            }}>
-                              {ingredient.trim()}
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-
-                    {/* Combined Instructions */}
-                    <div>
-                      <h4 style={{
-                        margin: '0 0 15px 0',
-                        color: '#8B5A3C',
-                        fontSize: '1.2rem',
-                        fontWeight: '600'
-                      }}>
-                        👨‍🍳 Combined Instructions
-                      </h4>
-                      <ol style={{
-                        padding: '0 0 0 20px',
-                        margin: 0
-                      }}>
-                        {instructionsList.map((instruction, index) => (
-                          <li key={index} style={{
-                            marginBottom: '12px',
-                            color: '#333',
-                            lineHeight: '1.5'
-                          }}>
-                            {instruction.trim()}
-                          </li>
-                        ))}
-                      </ol>
-                    </div>
-                  </div>
-
-                  {/* Combined Nutrition Info */}
-                  {(meal.nutrition?.calories || meal.nutrition?.protein || meal.nutrition?.servings) && (
-                    <div style={{
-                      background: '#F0D0C1',
-                      padding: '15px',
-                      borderRadius: '10px',
-                      border: '1px solid #EEB182'
-                    }}>
-                      <h4 style={{ margin: '0 0 10px 0', color: '#8B5A3C' }}>
-                        🥗 Combined Nutrition {meal.nutrition?.servings && `(makes ${meal.nutrition.servings} servings)`}
-                      </h4>
-                      <div style={{ display: 'flex', gap: '20px', fontSize: '14px', flexWrap: 'wrap' }}>
-                        {meal.nutrition?.calories && (
-                          <span style={{ color: '#333', fontWeight: '600' }}>
-                            Calories: {meal.nutrition.calories}
-                          </span>
-                        )}
-                        {meal.nutrition?.protein && (
-                          <span style={{ color: '#333', fontWeight: '600' }}>
-                            Protein: {meal.nutrition.protein}g
-                          </span>
-                        )}
-                        {meal.nutrition?.carbs && (
-                          <span style={{ color: '#333', fontWeight: '600' }}>
-                            Carbs: {meal.nutrition.carbs}g
-                          </span>
-                        )}
-                        {meal.nutrition?.fat && (
-                          <span style={{ color: '#333', fontWeight: '600' }}>
-                            Fat: {meal.nutrition.fat}g
-                          </span>
-                        )}
-                        {meal.nutrition?.fiber && (
-                          <span style={{ color: '#333', fontWeight: '600' }}>
-                            Fiber: {meal.nutrition.fiber}g
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  )}
                 </div>
-              )}
-            </div>
-          );
-        })
-      ) : (
-        <div style={{
-          textAlign: 'center',
-          padding: '60px 20px',
-          color: '#8B5A3C'
-        }}>
-          <div style={{ fontSize: '4rem', marginBottom: '20px' }}>🍽️</div>
-          <h3 style={{ margin: '0 0 10px 0', color: '#8B5A3C' }}>
-            {meals.length > 0 ? 'No meals match your filters' : 'No meals found, queen'}
-          </h3>
-          <p style={{ margin: 0, color: '#666' }}>
-            {meals.length > 0 
-              ? 'Try adjusting your filters!' 
-              : 'Create your first meal by combining recipes! 💅✨'}
-          </p>
-        </div>
-      )}
+
+                {/* Expanded Content */}
+                {isExpanded && (
+                  <div className={styles.expandedContent}>
+                    {/* Scale Section */}
+                    <div className={styles.expandedSection}>
+                      <h4 className={styles.sectionTitle}>🔢 Scale This Meal</h4>
+                      <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                        <input
+                          type="number"
+                          placeholder="New servings"
+                          min="1"
+                          className="input"
+                          style={{ width: '150px' }}
+                          onKeyPress={(e) => {
+                            if (e.key === 'Enter') {
+                              scaleMeal(meal, parseInt(e.target.value));
+                              e.target.value = '';
+                            }
+                          }}
+                          disabled={isScaling[meal.id]}
+                        />
+                        <button
+                          onClick={(e) => {
+                            const input = e.target.previousSibling;
+                            scaleMeal(meal, parseInt(input.value));
+                            input.value = '';
+                          }}
+                          disabled={isScaling[meal.id] || !openaiApiKey}
+                          className="btn btn-primary btn-sm"
+                        >
+                          {isScaling[meal.id] ? 'Scaling...' : 'Scale Meal'}
+                        </button>
+                      </div>
+                      {!openaiApiKey && (
+                        <p style={{ fontSize: '0.85rem', color: '#dc2626', marginTop: '5px' }}>
+                          ⚠️ OpenAI API key required for scaling
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Ingredients */}
+                    <div className={styles.expandedSection}>
+                      <h4 className={styles.sectionTitle}>🛒 Combined Ingredients</h4>
+                      <pre style={{ 
+                        whiteSpace: 'pre-wrap', 
+                        fontFamily: 'inherit',
+                        background: 'white',
+                        padding: '15px',
+                        borderRadius: '10px',
+                        border: '1px solid #EEB182',
+                        fontSize: '0.9rem'
+                      }}>
+                        {meal.ingredients}
+                      </pre>
+                    </div>
+
+                    {/* Instructions */}
+                    <div className={styles.expandedSection}>
+                      <h4 className={styles.sectionTitle}>👩‍🍳 Combined Instructions</h4>
+                      <pre style={{ 
+                        whiteSpace: 'pre-wrap', 
+                        fontFamily: 'inherit',
+                        background: 'white',
+                        padding: '15px',
+                        borderRadius: '10px',
+                        border: '1px solid #EEB182',
+                        fontSize: '0.9rem'
+                      }}>
+                        {meal.instructions}
+                      </pre>
+                    </div>
+
+                    {/* Nutrition */}
+                    {meal.nutrition && Object.values(meal.nutrition).some(v => v) && (
+                      <div className={styles.expandedSection}>
+                        <div className={styles.nutritionBox}>
+                          <h4 className={styles.nutritionTitle}>
+                            🥗 Combined Nutrition {meal.nutrition?.servings && `(makes ${meal.nutrition.servings} servings)`}
+                          </h4>
+                          <div className={styles.nutritionValues}>
+                            {meal.nutrition?.calories && (
+                              <span className={styles.nutritionValue}>
+                                Calories: {meal.nutrition.calories}
+                              </span>
+                            )}
+                            {meal.nutrition?.protein && (
+                              <span className={styles.nutritionValue}>
+                                Protein: {meal.nutrition.protein}g
+                              </span>
+                            )}
+                            {meal.nutrition?.carbs && (
+                              <span className={styles.nutritionValue}>
+                                Carbs: {meal.nutrition.carbs}g
+                              </span>
+                            )}
+                            {meal.nutrition?.fat && (
+                              <span className={styles.nutritionValue}>
+                                Fat: {meal.nutrition.fat}g
+                              </span>
+                            )}
+                            {meal.nutrition?.fiber && (
+                              <span className={styles.nutritionValue}>
+                                Fiber: {meal.nutrition.fiber}g
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })
+        ) : (
+          <div className={styles.emptyState}>
+            <div className={styles.emptyIcon}>🍽️</div>
+            <h3 className={styles.emptyTitle}>
+              {meals.length > 0 ? 'No meals match your filters' : 'No meals found, queen'}
+            </h3>
+            <p className={styles.emptyText}>
+              {meals.length > 0 
+                ? 'Try adjusting your filters!' 
+                : 'Create your first meal by combining recipes! 💅✨'}
+            </p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
