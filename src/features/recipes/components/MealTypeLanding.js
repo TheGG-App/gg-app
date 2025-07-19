@@ -1,4 +1,4 @@
-// src/features/recipes/components/MealTypeLanding.js - Self-contained version
+// src/features/recipes/components/MealTypeLanding.js - Safe self-contained version
 import React, { useState } from 'react';
 import { MEAL_TYPES } from '../utils/recipeUtils';
 
@@ -7,74 +7,76 @@ function MealTypeLanding({
   recipes = [],
   openaiApiKey,
   onRecipeClick,
-  onImportRecipe // New prop for handling import
+  onImportRecipe
 }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [showImportModal, setShowImportModal] = useState(false);
   const [importInput, setImportInput] = useState('');
   const [isImporting, setIsImporting] = useState(false);
   
+  // Safe filter function
+  const safeFilterRecipes = (recipesToFilter, searchQuery) => {
+    if (!Array.isArray(recipesToFilter) || !searchQuery) return [];
+    
+    const searchLower = searchQuery.toLowerCase();
+    
+    return recipesToFilter.filter((recipe, index) => {
+      try {
+        // Skip invalid recipes
+        if (!recipe || typeof recipe !== 'object') {
+          console.warn(`Invalid recipe at index ${index}:`, recipe);
+          return false;
+        }
+
+        // Safe property checks
+        const titleMatch = recipe.title && 
+          typeof recipe.title === 'string' && 
+          recipe.title.toLowerCase().includes(searchLower);
+
+        const ingredientsMatch = recipe.ingredients && 
+          typeof recipe.ingredients === 'string' && 
+          recipe.ingredients.toLowerCase().includes(searchLower);
+
+        const mealTypeMatch = recipe.mealType && 
+          typeof recipe.mealType === 'string' && 
+          recipe.mealType.toLowerCase().includes(searchLower);
+
+        return titleMatch || ingredientsMatch || mealTypeMatch;
+      } catch (error) {
+        console.error(`Error filtering recipe at index ${index}:`, recipe, error);
+        return false;
+      }
+    });
+  };
+  
   // Ensure recipes is always an array
   const safeRecipes = Array.isArray(recipes) ? recipes : [];
   
-  // Validate and filter out invalid recipes
+  // Validate recipes
   const validRecipes = safeRecipes.filter((recipe, index) => {
     if (!recipe || typeof recipe !== 'object') {
-      console.warn(`Invalid recipe at index ${index}:`, recipe);
+      console.warn(`Invalid recipe object at index ${index}:`, recipe);
       return false;
     }
     if (!recipe.title || typeof recipe.title !== 'string') {
-      console.warn(`Recipe missing title at index ${index}:`, recipe);
+      console.warn(`Recipe missing or invalid title at index ${index}:`, recipe);
       return false;
     }
     return true;
   });
   
-  // Log any invalid recipes for debugging
+  // Log validation results
   if (validRecipes.length < safeRecipes.length) {
     console.warn(`Found ${safeRecipes.length - validRecipes.length} invalid recipes out of ${safeRecipes.length} total`);
   }
   
   const getRecipeCount = (mealType) => {
     if (mealType === 'all') return validRecipes.length;
-    return validRecipes.filter(recipe => {
-      // Skip invalid recipes
-      if (!recipe || typeof recipe !== 'object') return false;
-      return recipe.mealType === mealType;
-    }).length;
+    return validRecipes.filter(recipe => recipe.mealType === mealType).length;
   };
 
-  // Filter recipes based on search with robust error handling
-  const filteredRecipes = searchTerm 
-    ? validRecipes.filter(recipe => {
-        // Skip invalid recipes
-        if (!recipe || typeof recipe !== 'object') {
-          console.warn('Invalid recipe object:', recipe);
-          return false;
-        }
-        
-        // Check if recipe has required properties
-        if (!recipe.title || typeof recipe.title !== 'string') {
-          console.warn('Recipe missing title:', recipe);
-          return false;
-        }
-        
-        const searchLower = searchTerm.toLowerCase();
-        
-        try {
-          return (
-            recipe.title.toLowerCase().includes(searchLower) ||
-            (recipe.ingredients && typeof recipe.ingredients === 'string' && 
-             recipe.ingredients.toLowerCase().includes(searchLower)) ||
-            (recipe.mealType && typeof recipe.mealType === 'string' && 
-             recipe.mealType.toLowerCase().includes(searchLower))
-          );
-        } catch (error) {
-          console.error('Error filtering recipe:', recipe, error);
-          return false;
-        }
-      })
-    : [];
+  // Filter recipes based on search
+  const filteredRecipes = searchTerm ? safeFilterRecipes(validRecipes, searchTerm) : [];
 
   const handleImportClick = async () => {
     if (!importInput.trim()) {
@@ -90,7 +92,6 @@ function MealTypeLanding({
     setIsImporting(true);
     
     try {
-      // If parent provided an import handler, use it
       if (onImportRecipe) {
         await onImportRecipe(importInput);
         setImportInput('');
