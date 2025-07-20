@@ -1,20 +1,26 @@
 // src/features/recipes/components/RecipeManager.js
 import React, { useState, useEffect } from 'react';
-import { collection, query, onSnapshot, doc, updateDoc, addDoc, deleteDoc } from 'firebase/firestore';
+import { collection, query, onSnapshot } from 'firebase/firestore';
 import { db } from '../../../config/firebase';
 import { useAuth } from '../../../contexts/AuthContext';
-import VirtualizedRecipeGrid from './VirtualizedRecipeGrid';
-import RecipeModal from './RecipeModal';
+import RecipesView from '../RecipesView';
+import MealsView from '../../meals/MealsView';
 
 function RecipeManager() {
-  const { user, isAdmin, isPrivileged } = useAuth();
+  const { user, isPrivileged } = useAuth();
+  const [currentView, setCurrentView] = useState('recipes');
   const [recipes, setRecipes] = useState([]);
+  const [meals, setMeals] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selectedRecipe, setSelectedRecipe] = useState(null);
-  const [openaiApiKey, setOpenaiApiKey] = useState(''); // Add if you use AI features
+  const [openaiApiKey, setOpenaiApiKey] = useState('');
 
   // Subscribe to recipes collection
   useEffect(() => {
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+
     const recipesRef = collection(db, 'recipes');
     const q = query(recipesRef);
 
@@ -34,106 +40,38 @@ function RecipeManager() {
     );
 
     return () => unsubscribe();
-  }, []);
+  }, [user]);
 
-  // Handle recipe updates (privileged users only)
-  const handleRecipeUpdate = async (recipeId, updates) => {
-    if (!isPrivileged) {
-      alert('You do not have permission to edit recipes.');
-      return;
-    }
+  // Subscribe to meals collection
+  useEffect(() => {
+    if (!user) return;
 
-    try {
-      const recipeRef = doc(db, 'recipes', recipeId);
-      await updateDoc(recipeRef, {
-        ...updates,
-        lastUpdatedBy: user.uid,
-        lastUpdatedByEmail: user.email,
-        lastUpdatedAt: new Date()
-      });
-    } catch (error) {
-      console.error('Error updating recipe:', error);
-      alert('Failed to update recipe. Please try again.');
-    }
-  };
+    const mealsRef = collection(db, 'meals');
+    const q = query(mealsRef);
 
-  // Add new recipe (privileged users only)
-  const handleAddRecipe = async () => {
-    if (!isPrivileged) {
-      alert('You do not have permission to add recipes.');
-      return;
-    }
-
-    const newRecipe = {
-      title: "New Recipe",
-      image: "",
-      cookTime: "30 mins",
-      mealType: "Dinner",
-      nutrition: {
-        calories: 0,
-        protein: 0,
-        carbs: 0,
-        fat: 0,
-        fiber: 0,
-        servings: 4
+    const unsubscribe = onSnapshot(q, 
+      (snapshot) => {
+        const mealsData = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        setMeals(mealsData);
       },
-      tags: {},
-      ingredients: "",
-      instructions: "",
-      createdBy: user.uid,
-      createdByEmail: user.email,
-      createdAt: new Date(),
-      lastUpdatedAt: new Date()
-    };
+      (error) => {
+        console.error("Error fetching meals:", error);
+      }
+    );
 
-    try {
-      const docRef = await addDoc(collection(db, 'recipes'), newRecipe);
-      console.log('Recipe created with ID:', docRef.id);
-      // Open the new recipe for editing
-      setSelectedRecipe({ id: docRef.id, ...newRecipe });
-    } catch (error) {
-      console.error('Error creating recipe:', error);
-      alert('Failed to create recipe. Please try again.');
-    }
-  };
+    return () => unsubscribe();
+  }, [user]);
 
-  // Delete recipe (privileged users only)
-  const handleDeleteRecipe = async (recipeId) => {
-    if (!isPrivileged) {
-      alert('You do not have permission to delete recipes.');
-      return;
+  // Load API key from localStorage
+  useEffect(() => {
+    const savedKey = localStorage.getItem('openai_api_key');
+    if (savedKey) {
+      setOpenaiApiKey(savedKey);
     }
-
-    try {
-      await deleteDoc(doc(db, 'recipes', recipeId));
-      setSelectedRecipe(null);
-    } catch (error) {
-      console.error('Error deleting recipe:', error);
-      alert('Failed to delete recipe. Please try again.');
-    }
-  };
-
-  // Handle saving scaled recipes
-  const handleSaveScaled = async (scaledRecipe) => {
-    if (!isPrivileged) {
-      alert('You do not have permission to save recipes.');
-      return;
-    }
-
-    try {
-      const docRef = await addDoc(collection(db, 'recipes'), {
-        ...scaledRecipe,
-        createdBy: user.uid,
-        createdByEmail: user.email,
-        createdAt: new Date(),
-        lastUpdatedAt: new Date()
-      });
-      console.log('Scaled recipe saved with ID:', docRef.id);
-    } catch (error) {
-      console.error('Error saving scaled recipe:', error);
-      alert('Failed to save scaled recipe. Please try again.');
-    }
-  };
+  }, []);
 
   if (loading) {
     return (
@@ -151,59 +89,71 @@ function RecipeManager() {
     );
   }
 
-  return (
-    <div style={{ padding: '20px' }}>
-      {/* Header with Add button for privileged users */}
-      <div style={{ 
-        marginBottom: '20px', 
-        display: 'flex', 
-        justifyContent: 'space-between',
-        alignItems: 'center'
-      }}>
-        <h2 style={{ margin: 0 }}>
-          {recipes.length} Recipes
-          {!isPrivileged && <span style={{ fontSize: '0.8rem', color: '#6b7280', marginLeft: '10px' }}>
-            (Read-Only Mode)
-          </span>}
-        </h2>
-        
-        {isPrivileged && (
-          <button 
-            onClick={handleAddRecipe}
-            style={{
-              padding: '10px 20px',
-              background: '#06b6d4',
-              color: 'white',
-              border: 'none',
-              borderRadius: '8px',
-              cursor: 'pointer',
-              fontSize: '1rem',
-              fontWeight: '500'
-            }}
-          >
-            + Add Recipe
-          </button>
-        )}
+  // Navigation bar
+  const renderNavigation = () => (
+    <div style={{
+      background: 'white',
+      borderBottom: '1px solid #e5e7eb',
+      padding: '1rem 2rem',
+      display: 'flex',
+      gap: '2rem',
+      alignItems: 'center',
+      boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+    }}>
+      <button
+        onClick={() => setCurrentView('recipes')}
+        style={{
+          background: currentView === 'recipes' ? '#06b6d4' : 'transparent',
+          color: currentView === 'recipes' ? 'white' : '#6b7280',
+          border: 'none',
+          padding: '0.5rem 1.5rem',
+          borderRadius: '8px',
+          cursor: 'pointer',
+          fontWeight: '600',
+          transition: 'all 0.2s'
+        }}
+      >
+        Recipes
+      </button>
+      
+      <button
+        onClick={() => setCurrentView('meals')}
+        style={{
+          background: currentView === 'meals' ? '#06b6d4' : 'transparent',
+          color: currentView === 'meals' ? 'white' : '#6b7280',
+          border: 'none',
+          padding: '0.5rem 1.5rem',
+          borderRadius: '8px',
+          cursor: 'pointer',
+          fontWeight: '600',
+          transition: 'all 0.2s'
+        }}
+      >
+        Meal Combos
+      </button>
+
+      <div style={{ marginLeft: 'auto', fontSize: '0.9rem', color: '#6b7280' }}>
+        {!isPrivileged && '(Read-Only Mode)'}
       </div>
+    </div>
+  );
 
-      {/* Recipe Grid */}
-      <VirtualizedRecipeGrid
-        recipes={recipes}
-        onRecipeClick={setSelectedRecipe}
-        onRecipeUpdate={isPrivileged ? handleRecipeUpdate : () => {}}
-        containerHeight={window.innerHeight - 200}
-      />
-
-      {/* Recipe Modal */}
-      {selectedRecipe && (
-        <RecipeModal
-          recipe={selectedRecipe}
-          isOpen={!!selectedRecipe}
-          onClose={() => setSelectedRecipe(null)}
-          onUpdate={isPrivileged ? handleRecipeUpdate : null}
-          onDelete={isPrivileged ? handleDeleteRecipe : null}
+  return (
+    <div>
+      {renderNavigation()}
+      
+      {currentView === 'recipes' ? (
+        <RecipesView
+          recipes={recipes}
+          setRecipes={setRecipes}
           openaiApiKey={openaiApiKey}
-          onSaveScaled={isPrivileged ? handleSaveScaled : null}
+        />
+      ) : (
+        <MealsView
+          meals={meals}
+          setMeals={setMeals}
+          recipes={recipes}
+          openaiApiKey={openaiApiKey}
         />
       )}
     </div>
